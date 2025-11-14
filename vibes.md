@@ -20,7 +20,7 @@ The project is intentionally chaotic, intentionally stateless, and intentionally
 
 ## 💡 Core Vibe / Philosophy
 
-- **No database. No localStorage. No files. No memory.**  
+- **No database. No localStorage. No files. No memory.**
   The only source of truth is the **message payload currently bouncing around Earth**.
 
 - **Every update triggers a complete forward-and-back traversal.**  
@@ -31,8 +31,15 @@ The project is intentionally chaotic, intentionally stateless, and intentionally
 - **Every hop logs its Cloudflare colo, country, ASN, & direction.**  
   This creates a beautiful end-to-end trace of the todo list’s global pilgrimage.
 
-- **The browser is a dumb terminal.**  
+- **The browser is a dumb terminal.**
   It just displays the latest mutated LLM response and sends it back into the void.
+
+---
+
+## ✅ Working Agreements & Rituals
+
+- **Always consult this `vibes.md` before touching code.**
+- **Always update this `vibes.md` after touching code** so the global relay team shares the same headspace.
 
 ---
 
@@ -564,3 +571,9 @@ wrangler deploy --env brazil
 wrangler deploy --env uk
 wrangler deploy --env singapore
 wrangler deploy --env sydney
+
+---
+
+## 🛠 Implementation Log
+
+- **2025-11-14** – Bootstrapped the unified `src/worker.mjs` Cloudflare Worker implementing the relay API, global hop logging, OpenRouter integration, and the browser UI loop described above.
