@@ -112,6 +112,15 @@ Includes:
 	•	full LLM JSON
 	•	Returns this to the browser
 
+### `docs/index.html`
+Static GitHub Pages build of the browser UI. Mirrors the Worker-served interface but prompts you to enter the first-hop endpoint (absolute or relative) before launching the loop.
+
+When running from GitHub Pages:
+
+- Point GitHub Pages at the `/docs` folder on the `main` branch.
+- Set the Cloudflare Worker environment variable `CORS_ALLOW_ORIGIN` (e.g. `*`, your Pages origin, or `request-origin`) so the first hop will satisfy the cross-origin `OPTIONS` + `POST` dance.
+- Paste the public first-hop URL (e.g. `https://us-east.example.com/api/hop`) into the field on every load—no storage, only vibes.
+
 ⸻
 
 🗺️ wrangler.toml
@@ -576,4 +585,5 @@ wrangler deploy --env sydney
 
 ## 🛠 Implementation Log
 
+- **2025-02-14** – Added GitHub Pages static UI (`docs/index.html`) with configurable first-hop endpoint input and gave the Worker CORS superpowers (`CORS_ALLOW_ORIGIN`) so the static site can loop the relay across origins.
 - **2025-11-14** – Bootstrapped the unified `src/worker.mjs` Cloudflare Worker implementing the relay API, global hop logging, OpenRouter integration, and the browser UI loop described above.
