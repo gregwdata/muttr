@@ -31,7 +31,7 @@ This repo now ships a real around-the-world relay implemented with **Azure Funct
    - The first hop extracts the assistant text, wraps hop metadata + raw JSON into a response, and sends it back to the caller.
 
 5. **Browser UI**
-   - `docs/index.html` is a static viewer/loop driver. Point it at the US East Function endpoint and it will stream the todo list through the relay forever.
+   - `docs/index.html` is a static viewer/loop driver that always targets the public US East Function entry hop and streams the todo list through the relay forever.
 
 ---
 
@@ -45,7 +45,7 @@ host.json          # Azure Functions host config
 .github/workflows/
   deploy-muttr-hops.yml  # CI/CD that provisions + deploys all Function Apps
 src/worker.mjs     # Legacy Cloudflare Worker prototype (kept for reference)
-docs/index.html    # Static UI that can target the first hop endpoint
+docs/index.html    # Static UI locked to the public first hop endpoint
 ```
 
 The Cloudflare Worker script is still present for posterity but no longer powers the live relay. The public UI now deploys to **Cloudflare Pages** at [`https://muttr.materialmachinelearn.ing`](https://muttr.materialmachinelearn.ing), which simply hosts the static client in `docs/`.
@@ -115,9 +115,8 @@ Set environment variables before starting (e.g. `HOP_NAME`, `NEXT_HOP_URL`). You
 ## 🖥️ Driving the loop from the browser
 
 1. Serve or open `docs/index.html` (GitHub Pages works great).
-2. Paste the first hop endpoint (e.g. `https://muttr-us-east.azurewebsites.net/api/muttr`).
-3. Provide an initial todo seed and hit **Start**.
-4. Watch the assistant text mutate, the hop chain grow, and the raw OpenRouter JSON scroll by.
+2. Provide an initial todo seed and hit **Start**.
+3. Watch the assistant text mutate, the hop chain grow, and the raw OpenRouter JSON scroll by.
 
 Every response is immediately sent back into the relay, so the loop keeps running until you press **Stop**.
 
@@ -132,7 +131,7 @@ The static interface in `docs/` is automatically published to Cloudflare Pages s
 3. **Triggers** – Any push to `main` that touches the UI, the README, the workflow, or `vibes.md` will redeploy. You can also use the manual **Run workflow** button.
 4. **DNS** – Point `muttr.materialmachinelearn.ing` at the Cloudflare Pages project per Cloudflare’s instructions (typically a CNAME to `<project>.pages.dev`). The workflow call to the Cloudflare API keeps the association in sync.
 
-Once the workflow finishes, the UI is live at [`https://muttr.materialmachinelearn.ing`](https://muttr.materialmachinelearn.ing). Update the endpoint field in the page if you are running your own hop chain instead of the default Azure deployment.
+Once the workflow finishes, the UI is live at [`https://muttr.materialmachinelearn.ing`](https://muttr.materialmachinelearn.ing). The hosted page always loops through the public Azure entry hop.
 
 ---
 
