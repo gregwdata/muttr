@@ -232,7 +232,7 @@
     </main>
 
     <footer>
-      <p>There is no storage. Only vibes. Powered by Cloudflare Workers + OpenRouter.</p>
+      <p>There is no storage. Only vibes. Powered by Azure Functions + OpenRouter.</p>
     </footer>
 
     <script>
@@ -250,12 +250,12 @@
       const errorEl = document.querySelector('#error');
 
       const runningOnGitHubPages = window.location.hostname.endsWith('github.io');
-      const defaultEndpoint = runningOnGitHubPages ? '' : '/api/hop';
+      const defaultEndpoint = runningOnGitHubPages ? '' : '/api/muttr';
       if (defaultEndpoint) {
         endpointInput.value = defaultEndpoint;
-        endpointNotice.textContent = 'Defaulting to relative /api/hop for self-hosted deployments.';
+        endpointNotice.textContent = 'Defaulting to relative /api/muttr for self-hosted deployments.';
       } else {
-        endpointNotice.textContent = 'Add the URL to your first Cloudflare Worker hop (e.g. https://us-east.example.com/api/hop).';
+        endpointNotice.textContent = 'Add the URL to your first Azure Function hop (e.g. https://muttr-us-east.azurewebsites.net/api/muttr).';
       }
 
       let running = false;

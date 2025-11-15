@@ -1,97 +1,119 @@
 # muttr
 
-muttr is a stateless, globe-trotting todo experiment that bounces every update across a daisy chain of Cloudflare Workers before asking an OpenRouter-hosted LLM how to mutate the list next. The browser never stores anything locally—each loop pulls fresh instructions from the worker relay and immediately hurls them back into the planetary circuit.
+muttr is a stateless, globe-trotting TODO experiment where the list itself is just the body of an HTTP request. Each time the list changes it is shipped from region to region, handed to an LLM (via OpenRouter) on the final forward hop, and then raced back to the origin so the browser can immediately fling it around the world again.
 
-## cloudfare configuration step-by-step
+This repo now ships a real around-the-world relay implemented with **Azure Functions**. Every hop runs the same code (`MuttrHop/index.js`), but Function App configuration tells it whether to forward the payload onward, call OpenRouter, or finish the return leg. A GitHub Actions workflow provisions and deploys five Function Apps so the payload actually travels East US → Brazil South → UK South → Southeast Asia → Australia East and back.
 
-1. **Gather the prerequisites**
-   - A Cloudflare account with a zone configured for the five hop subdomains (`us-east`, `brazil`, `uk`, `singapore`, `sydney`).
-   - Wrangler 3+ installed locally and authenticated (`npx wrangler login`).
-   - An OpenRouter API key; this is stored as a secret on the last hop.
-   - (Optional) A GitHub Pages site pointing at `docs/` if you want a static UI that can target the first hop.
+---
 
-2. **Clone and inspect the repo**
-   ```bash
-   git clone https://github.com/YOUR-ORG/muttr.git
-   cd muttr
-   ```
-   Review `src/worker.mjs` to understand the hop logic and ensure the HTML UI meets your needs.
+## 🌐 Architecture
 
-3. **Review `wrangler.toml`**
-   The repo now includes a ready-to-customize `wrangler.toml` that sets up each hop with the shared worker script. Open the file, swap `YOURDOMAIN.COM` for your zone, and adjust the `DELAY_MS` values or environment bindings as needed before deploying.
+1. **Five Azure Function Apps (Consumption plan, Node 20)**
+   - `muttr-us-east` (`eastus`)
+   - `muttr-brazil` (`brazilsouth`)
+   - `muttr-uk` (`uksouth`)
+   - `muttr-singapore` (`southeastasia`)
+   - `muttr-sydney` (`australiaeast`)
 
-4. **Configure secrets and optional CORS**
-   - Run `npx wrangler secret put OPENROUTER_API_KEY --env sydney` and paste your key. The Sydney hop is responsible for calling OpenRouter.
-   - If you host the UI separately (for example via GitHub Pages), set `CORS_ALLOW_ORIGIN` on the first hop with `npx wrangler secret put CORS_ALLOW_ORIGIN --env us_east` and supply `*` or the origin of your static site.
+   Each app exposes `POST https://<app>.azurewebsites.net/api/muttr` and shares the same implementation.
 
-5. **Deploy the hops in order**
-   ```bash
-   npx wrangler deploy --env us_east
-   npx wrangler deploy --env brazil
-   npx wrangler deploy --env uk
-   npx wrangler deploy --env singapore
-   npx wrangler deploy --env sydney
-   ```
-   Each command publishes the same Worker script with environment-specific bindings, building the forward and return relay chain.
+2. **Hop headers**
+   - `X-Direction`: `forward` or `return`
+   - `X-Hop-Chain`: comma-separated list of hop(direction)
+   - `X-Hop-Log`: newline-delimited JSON log entries for observability
 
-6. **Smoke-test the full relay**
-   - Hit `https://us-east.YOURDOMAIN.COM/` and start the loop from the built-in UI, or open `docs/index.html` locally and point it at the first hop.
-   - Watch the hop log and assistant text to confirm the OpenRouter response flows all the way back.
+3. **Forward leg**
+   - Every hop appends metadata, waits for any configured delay, and POSTs to `NEXT_HOP_URL` if set.
+   - The final forward hop (Sydney) calls OpenRouter, using `OPENROUTER_API_KEY` + `OPENROUTER_MODEL` from its app settings.
 
-## Automated deployment with GitHub Actions
+4. **Return leg**
+   - The OpenRouter JSON is POSTed backward through `PREV_HOP_URL` until it reaches the first hop (US East).
+   - The first hop extracts the assistant text, wraps hop metadata + raw JSON into a response, and sends it back to the caller.
 
-Yes—you can wire up a GitHub Action that deploys each hop sequentially whenever you push to `main`. The example below (also committed at `.github/workflows/cloudflare-relay-deploy.yml`) assumes your repository has a `wrangler.toml` like the one above and that you have stored the OpenRouter key in your repo secrets as `OPENROUTER_API_KEY`. The Cloudflare API token must have “Edit Cloudflare Workers” permissions and be stored as `CLOUDFLARE_API_TOKEN`.
+5. **Browser UI**
+   - `docs/index.html` is a static viewer/loop driver. Point it at the US East Function endpoint and it will stream the todo list through the relay forever.
 
-```yaml
-name: Deploy Workers relay
+---
 
-on:
-  push:
-    branches: ["main"]
-  workflow_dispatch: {}
+## 📁 Repository layout
 
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    env:
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Install Wrangler
-        run: npm install -g wrangler
-
-      - name: Deploy us-east hop
-        run: wrangler deploy --env us_east
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-
-      - name: Deploy brazil hop
-        run: wrangler deploy --env brazil
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-
-      - name: Deploy uk hop
-        run: wrangler deploy --env uk
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-
-      - name: Deploy singapore hop
-        run: wrangler deploy --env singapore
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-
-      - name: Deploy sydney hop
-        run: wrangler deploy --env sydney
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+```
+MuttrHop/          # Azure Function (single hop) implementation
+  ├─ function.json # HTTP trigger binding (POST /api/muttr)
+  └─ index.js      # Hop logic, OpenRouter integration, forward/return handling
+host.json          # Azure Functions host config
+.github/workflows/
+  deploy-muttr-hops.yml  # CI/CD that provisions + deploys all Function Apps
+src/worker.mjs     # Legacy Cloudflare Worker prototype (kept for reference)
+docs/index.html    # Static UI that can target the first hop endpoint
 ```
 
-Because the worker source is identical for each environment, serial deployment ensures that every hop stays in sync with the latest code and configuration. You can further optimize this job by matrixing environments or caching dependencies, but the above workflow is sufficient for a reliable continuous deployment pipeline.
+The Cloudflare Worker script is still present for posterity but no longer powers the live relay.
+
+---
+
+## 🚀 Deploying the hop chain with GitHub Actions
+
+1. **Create Azure resources & credentials**
+   - Pick a unique storage account name (default `muttrfuncstorage123`).
+   - Run once (locally or in Cloud Shell):
+     ```bash
+     az ad sp create-for-rbac \
+       --name muttr-gha-sp \
+       --role contributor \
+       --scopes /subscriptions/<SUBSCRIPTION_ID>
+     ```
+   - Copy the JSON output into the GitHub secret `AZURE_CREDENTIALS`.
+
+2. **Store your OpenRouter key**
+   - Add `OPENROUTER_API_KEY` as a GitHub secret.
+
+3. **(Optional) Adjust workflow defaults**
+   - Edit `.github/workflows/deploy-muttr-hops.yml` if you need different app names, regions, delays, or OpenRouter model.
+   - `AZURE_RESOURCE_GROUP_LOCATION` pins the resource group + storage account location (resources can still live in any region).
+   - `AZURE_SUBSCRIPTION_ID` is populated automatically from the service principal JSON so we can explicitly select the subscription before provisioning.
+   - The workflow runs the matrix sequentially (`max-parallel: 1`) so the US East hop provisions shared resources before later regions deploy.
+   - The matrix defines the full hop chain. Update `nextUrl` / `prevUrl` values if you rename Function Apps or use custom domains.
+
+4. **Trigger a deployment**
+   - Push to `main` or run the workflow manually from the GitHub Actions tab.
+   - The job performs:
+     - Azure login via the service principal.
+     - Resource group creation (idempotent, uses `AZURE_RESOURCE_GROUP_LOCATION`).
+     - Storage account creation (only on the first matrix iteration, also in `AZURE_RESOURCE_GROUP_LOCATION`).
+     - Function App creation if missing.
+     - App settings updates for hop wiring + OpenRouter credentials on the final hop.
+     - Code deployment for each Function App via `Azure/functions-action@v1`.
+
+> **Note:** The storage account name must be globally unique. Update `AZURE_STORAGE_ACCOUNT` in the workflow if the default is taken.
+
+---
+
+## 🧪 Manual testing
+
+If you want to run a single hop locally with Azure Functions Core Tools:
+
+```bash
+npm install -g azure-functions-core-tools@4 --unsafe-perm true
+func start
+```
+
+Set environment variables before starting (e.g. `HOP_NAME`, `NEXT_HOP_URL`). You can mimic the forward leg by POSTing to `http://localhost:7071/api/muttr` with the appropriate headers.
+
+---
+
+## 🖥️ Driving the loop from the browser
+
+1. Serve or open `docs/index.html` (GitHub Pages works great).
+2. Paste the first hop endpoint (e.g. `https://muttr-us-east.azurewebsites.net/api/muttr`).
+3. Provide an initial todo seed and hit **Start**.
+4. Watch the assistant text mutate, the hop chain grow, and the raw OpenRouter JSON scroll by.
+
+Every response is immediately sent back into the relay, so the loop keeps running until you press **Stop**.
+
+---
+
+## ♻️ Legacy Cloudflare prototype
+
+The previous Cloudflare Worker-based relay remains in `src/worker.mjs` and `wrangler.toml` for historical context. Those files are no longer deployed by default, and the GitHub Actions workflow that targeted Cloudflare has been removed in favor of the Azure Functions pipeline above.
+
