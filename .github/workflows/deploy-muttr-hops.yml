@@ -11,6 +11,7 @@ env:
   AZURE_STORAGE_ACCOUNT: muttrfuncstorage123
   AZURE_FUNCTIONAPP_PACKAGE_PATH: '.'
   NODE_VERSION: '20.x'
+  AZURE_NODE_VERSION: '20'
   AZURE_SUBSCRIPTION_ID: ${{ fromJson(secrets.AZURE_CREDENTIALS).subscriptionId }}
 
 jobs:
@@ -116,6 +117,7 @@ jobs:
               --storage-account "$AZURE_STORAGE_ACCOUNT" \
               --consumption-plan-location "$REGION" \
               --runtime node \
+              --runtime-version ${{ env.AZURE_NODE_VERSION }} \
               --functions-version 4 \
               --os-type Linux \
               --subscription "$AZURE_SUBSCRIPTION_ID"
