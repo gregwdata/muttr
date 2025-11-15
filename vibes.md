@@ -63,6 +63,7 @@ Legacy Cloudflare Worker prototype retained for historical reference. No longer 
 
 ## 🛠 Implementation Log
 
+- **2025-03-04** – Embedded the original relay UI at the bottom of `docs/index.html`, wired the “Launch the Relay” CTAs to scroll straight to it, and restored the Leaflet-powered map plus hop loop so the marketing page still delivers the working app.
 - **2025-03-02** – Added a technology showcase to `docs/index.html` that explains the global hop choreography (now with “so agentic, much wow” energy) and forced the hero modal to reappear on every visit for maximum theatrical pacing.
 - **2025-03-03** – Restored the long-form, SaaS-grade marketing scroll in `docs/index.html`, softened the technology copy into vibe-rich, globe-trotting language (still featuring “so agentic, much wow”), and kept the modal firing on every visit.
 - **2025-03-01** – Rebuilt `docs/index.html` into a marketing-forward landing page with a launch modal, blurred background treatment, long-form feature storytelling, and call-to-action flows for the muttr relay.
