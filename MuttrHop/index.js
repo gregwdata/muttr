@@ -10,6 +10,26 @@ module.exports = async function (context, req) {
 
   const direction = req.headers["x-direction"] || "forward";
 
+  const origin = req.headers.origin;
+  const corsHeaders = {
+    "Access-Control-Allow-Origin": origin || "*",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, X-Direction, X-Hop-Chain, X-Hop-Log"
+  };
+
+  function setResponse(status, headers, body) {
+    context.res = {
+      status,
+      headers: { ...corsHeaders, ...headers },
+      body
+    };
+  }
+
+  if (req.method === "OPTIONS") {
+    setResponse(204, {}, null);
+    return;
+  }
+
   const body =
     req.rawBody ||
     (typeof req.body === "string"
@@ -56,15 +76,15 @@ module.exports = async function (context, req) {
       });
     } catch (err) {
       context.log.error(`Failed to contact hop ${targetUrl}:`, err);
-      context.res = {
-        status: 502,
-        headers: {
+      setResponse(
+        502,
+        {
           "Content-Type": "text/plain",
           "X-Hop-Chain": newChain,
           "X-Hop-Log": `${newLog}\n${JSON.stringify({ error: String(err) })}`
         },
-        body: `Failed to reach hop at ${targetUrl}`
-      };
+        `Failed to reach hop at ${targetUrl}`
+      );
       return;
     }
 
@@ -72,15 +92,15 @@ module.exports = async function (context, req) {
     const respHopChain = resp.headers.get("x-hop-chain") || newChain;
     const respHopLog = resp.headers.get("x-hop-log") || newLog;
 
-    context.res = {
-      status: resp.status,
-      headers: {
+    setResponse(
+      resp.status,
+      {
         "Content-Type": resp.headers.get("content-type") || "text/plain",
         "X-Hop-Chain": respHopChain,
         "X-Hop-Log": respHopLog
       },
-      body: text
-    };
+      text
+    );
   }
 
   if (direction === "forward") {
@@ -89,10 +109,7 @@ module.exports = async function (context, req) {
     }
 
     if (!OPENROUTER_API_KEY) {
-      context.res = {
-        status: 500,
-        body: "OPENROUTER_API_KEY not configured on this app."
-      };
+      setResponse(500, {}, "OPENROUTER_API_KEY not configured on this app.");
       return;
     }
 
@@ -124,15 +141,15 @@ module.exports = async function (context, req) {
       });
     } catch (err) {
       context.log.error("OpenRouter call failed:", err);
-      context.res = {
-        status: 502,
-        headers: {
+      setResponse(
+        502,
+        {
           "Content-Type": "text/plain",
           "X-Hop-Chain": newChain,
           "X-Hop-Log": `${newLog}\n${JSON.stringify({ error: String(err) })}`
         },
-        body: "Failed to reach OpenRouter"
-      };
+        "Failed to reach OpenRouter"
+      );
       return;
     }
 
@@ -142,15 +159,15 @@ module.exports = async function (context, req) {
       return callHop(PREV_HOP_URL, "return", orText);
     }
 
-    context.res = {
-      status: 200,
-      headers: {
+    setResponse(
+      200,
+      {
         "Content-Type": "application/json",
         "X-Hop-Chain": newChain,
         "X-Hop-Log": newLog
       },
-      body: orText
-    };
+      orText
+    );
     return;
   }
 
@@ -203,20 +220,17 @@ module.exports = async function (context, req) {
       2
     );
 
-    context.res = {
-      status: 200,
-      headers: {
+    setResponse(
+      200,
+      {
         "Content-Type": "application/json",
         "X-Hop-Chain": newChain,
         "X-Hop-Log": newLog
       },
-      body: responseBody
-    };
+      responseBody
+    );
     return;
   }
 
-  context.res = {
-    status: 500,
-    body: "Invalid direction state"
-  };
+  setResponse(500, {}, "Invalid direction state");
 };
