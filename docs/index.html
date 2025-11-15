@@ -3,797 +3,938 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>muttr · global todo telephone</title>
+    <title>muttr · Give your worries a world tour</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;700&display=swap"
       rel="stylesheet"
-      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-      integrity="sha256-o9N1j7kCpk//4cw3AV2uy1S8MaqkOawx2UY8ailqXFw="
-      crossorigin=""
     />
-    <script
-      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-      integrity="sha256-XQoYMqMTK8LvdlDXvxdgZGH5f9s74pNgMDwWv6f5pFg="
-      crossorigin=""
-    ></script>
     <style>
       :root {
-        color-scheme: dark light;
+        color-scheme: dark;
+        --bg: radial-gradient(circle at 10% -10%, #1f2937, #0f172a 45%, #020617 85%);
+        --accent: linear-gradient(120deg, #f97316, #f43f5e, #6366f1);
+        --glass: rgba(15, 23, 42, 0.7);
+        --border: rgba(148, 163, 184, 0.28);
+        --text: #f8fafc;
         font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        background: radial-gradient(circle at top left, #1f2937, #111827 50%, #0b1120);
-        color: #f9fafb;
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      * {
+        box-sizing: border-box;
       }
 
       body {
         margin: 0;
         min-height: 100vh;
-        display: grid;
-        grid-template-rows: auto 1fr auto;
-        padding: 1.5rem;
-        gap: 1.5rem;
+        background: var(--bg);
+        color: var(--text);
+        overflow-x: hidden;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      code {
+        font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+        background: rgba(15, 23, 42, 0.85);
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        padding: 0.1rem 0.35rem;
+        border-radius: 6px;
+        font-size: 0.95em;
       }
 
       header {
-        display: flex;
-        flex-direction: column;
-        gap: 0.5rem;
-      }
-
-      h1 {
-        margin: 0;
-        font-size: clamp(1.8rem, 3vw, 2.6rem);
-      }
-
-      main {
-        display: grid;
-        gap: 1.5rem;
-        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-        align-items: start;
-      }
-
-      section {
-        background: rgba(15, 23, 42, 0.72);
-        border: 1px solid rgba(148, 163, 184, 0.18);
-        border-radius: 16px;
-        padding: 1.25rem;
-        box-shadow: 0 25px 45px rgba(15, 23, 42, 0.45);
+        position: sticky;
+        top: 0;
+        z-index: 5;
         backdrop-filter: blur(16px);
+        background: rgba(2, 6, 23, 0.7);
+        border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+      }
+
+      .nav {
         display: flex;
-        flex-direction: column;
-        gap: 1rem;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1.5rem;
+        padding: 1.2rem clamp(1.5rem, 5vw, 4rem);
+        max-width: 1200px;
+        margin: 0 auto;
       }
 
-      textarea {
-        min-height: 240px;
-        resize: vertical;
-        width: 100%;
-        padding: 0.75rem;
-        border-radius: 12px;
-        border: 1px solid rgba(148, 163, 184, 0.2);
-        background: rgba(15, 23, 42, 0.6);
-        color: inherit;
-        font-size: 0.95rem;
-        line-height: 1.5;
-        font-family: "Iosevka", "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+      .brand {
+        font-family: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
+        font-size: 1.25rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
       }
 
-      textarea.compact {
-        min-height: 120px;
-      }
-
-      .text-input {
-        width: 100%;
-        padding: 0.75rem;
-        border-radius: 12px;
-        border: 1px solid rgba(148, 163, 184, 0.2);
-        background: rgba(15, 23, 42, 0.6);
-        color: inherit;
-        font-size: 0.95rem;
-        line-height: 1.4;
-        font-family: "Iosevka", "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
-      }
-
-      .suggestion-buttons {
+      .nav-links {
         display: flex;
-        flex-wrap: wrap;
-        gap: 0.5rem;
-        margin-top: 0.25rem;
+        gap: clamp(1rem, 3vw, 2rem);
+        font-size: 0.95rem;
+        opacity: 0.82;
       }
 
-      .suggestion-buttons button {
-        white-space: nowrap;
-      }
-
-      button {
+      .cta-button,
+      .pill-button {
         appearance: none;
         border: none;
         border-radius: 999px;
-        padding: 0.75rem 1.5rem;
+        padding: 0.85rem 1.8rem;
         font-weight: 600;
         font-size: 0.95rem;
         cursor: pointer;
-        transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
-        background: linear-gradient(120deg, #f97316, #ec4899);
+        background: var(--accent);
         color: white;
-        box-shadow: 0 18px 30px rgba(236, 72, 153, 0.35);
+        box-shadow: 0 24px 45px rgba(99, 102, 241, 0.35);
+        transition: transform 0.18s ease, box-shadow 0.18s ease;
       }
 
-      button:hover:not([disabled]) {
-        transform: translateY(-1px);
-        box-shadow: 0 20px 40px rgba(236, 72, 153, 0.45);
-      }
-
-      button.secondary-button {
-        background: rgba(15, 23, 42, 0.55);
-        color: #f97316;
-        border: 1px solid rgba(249, 115, 22, 0.4);
+      .pill-button.secondary {
+        background: rgba(148, 163, 184, 0.12);
+        color: var(--text);
         box-shadow: none;
-        padding: 0.6rem 1.1rem;
+        border: 1px solid rgba(148, 163, 184, 0.2);
       }
 
-      button.secondary-button:hover:not([disabled]) {
-        box-shadow: 0 12px 22px rgba(249, 115, 22, 0.25);
+      .cta-button:hover,
+      .pill-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 28px 55px rgba(244, 63, 94, 0.35);
       }
 
-      button[disabled] {
-        cursor: progress;
-        opacity: 0.65;
-        box-shadow: none;
+      main {
+        position: relative;
       }
 
-      .controls {
-        display: flex;
-        gap: 0.75rem;
-        flex-wrap: wrap;
+      #site-content {
+        transition: filter 0.35s ease, transform 0.35s ease;
+      }
+
+      body.modal-open #site-content {
+        filter: blur(18px) saturate(0.85);
+        transform: scale(0.99);
+        pointer-events: none;
+        user-select: none;
+      }
+
+      .hero {
+        padding: clamp(5rem, 12vw, 9rem) clamp(1.5rem, 6vw, 6rem) clamp(5rem, 10vw, 8rem);
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 3rem;
         align-items: center;
+        max-width: 1200px;
+        margin: 0 auto;
       }
 
-      .stack {
+      .hero-copy h1 {
+        font-size: clamp(2.8rem, 6vw, 4.8rem);
+        margin: 0 0 1.25rem;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+      }
+
+      .hero-copy p {
+        font-size: clamp(1.05rem, 2.4vw, 1.35rem);
+        line-height: 1.7;
+        max-width: 520px;
+        margin: 0 0 2rem;
+        color: rgba(226, 232, 240, 0.9);
+      }
+
+      .hero-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: rgba(148, 163, 184, 0.14);
+        border-radius: 999px;
+        padding: 0.5rem 1.1rem;
+        font-size: 0.85rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .hero-card {
+        background: rgba(15, 23, 42, 0.7);
+        border-radius: 24px;
+        padding: 2rem;
+        border: 1px solid rgba(99, 102, 241, 0.18);
+        box-shadow: 0 40px 80px rgba(15, 23, 42, 0.6);
+        position: relative;
+        overflow: hidden;
+        isolation: isolate;
+      }
+
+      .hero-card::before {
+        content: "";
+        position: absolute;
+        inset: -30% -40% auto;
+        height: 70%;
+        background: radial-gradient(circle at center, rgba(244, 114, 182, 0.45), rgba(99, 102, 241, 0));
+        z-index: -1;
+      }
+
+      .hero-card h2 {
+        font-size: 1.2rem;
+        font-weight: 600;
+        margin: 0 0 1.2rem;
+      }
+
+      .hero-card ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 1.1rem;
+      }
+
+      .hero-card li {
+        background: rgba(15, 23, 42, 0.55);
+        border: 1px solid rgba(148, 163, 184, 0.14);
+        padding: 1rem 1.2rem;
+        border-radius: 18px;
+        font-size: 0.95rem;
+        line-height: 1.6;
+        display: grid;
+        gap: 0.25rem;
+      }
+
+      .hero-card strong {
+        font-family: "Plus Jakarta Sans", "Inter", sans-serif;
+        font-weight: 700;
+        font-size: 0.95rem;
+        letter-spacing: 0.02em;
+        color: rgba(244, 244, 255, 0.95);
+      }
+
+      .section {
+        padding: clamp(4rem, 9vw, 7rem) clamp(1.5rem, 6vw, 6rem);
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+
+      .section h2 {
+        font-size: clamp(2.1rem, 4vw, 3.2rem);
+        margin: 0 0 1.2rem;
+      }
+
+      .section p.lead {
+        max-width: 640px;
+        font-size: clamp(1rem, 2vw, 1.2rem);
+        line-height: 1.7;
+        color: rgba(226, 232, 240, 0.85);
+        margin: 0 0 2.8rem;
+      }
+
+      .feature-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 1.8rem;
+      }
+
+      .feature-card {
+        background: rgba(15, 23, 42, 0.68);
+        border-radius: 22px;
+        padding: 1.8rem;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .feature-card::after {
+        content: "";
+        position: absolute;
+        inset: auto -30% -30% auto;
+        width: 160px;
+        height: 160px;
+        background: radial-gradient(circle at center, rgba(99, 102, 241, 0.3), transparent 70%);
+        opacity: 0.65;
+        pointer-events: none;
+      }
+
+      .feature-card h3 {
+        margin: 0 0 0.75rem;
+        font-size: 1.15rem;
+      }
+
+      .feature-card p {
+        margin: 0;
+        font-size: 0.95rem;
+        line-height: 1.65;
+        color: rgba(226, 232, 240, 0.82);
+      }
+
+      .tech-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: clamp(1.5rem, 3vw, 2.5rem);
+        margin-top: 2.8rem;
+      }
+
+      .tech-card {
+        background: rgba(15, 23, 42, 0.65);
+        border: 1px solid rgba(99, 102, 241, 0.2);
+        border-radius: 24px;
+        padding: 2rem;
+        box-shadow: 0 35px 60px rgba(2, 6, 23, 0.5);
         display: flex;
         flex-direction: column;
-        gap: 0.75rem;
+        gap: 1rem;
+        position: relative;
       }
 
-      .badge {
+      .tech-card::after {
+        content: "";
+        position: absolute;
+        inset: auto auto -20% -20%;
+        width: 140px;
+        height: 140px;
+        background: radial-gradient(circle at center, rgba(244, 114, 182, 0.3), transparent 70%);
+        opacity: 0.6;
+        pointer-events: none;
+      }
+
+      .tech-card h3 {
+        margin: 0;
+        font-size: 1.15rem;
+      }
+
+      .tech-card p,
+      .tech-card li {
+        color: rgba(226, 232, 240, 0.88);
+        line-height: 1.65;
+      }
+
+      .tech-card ul {
+        margin: 0;
+        padding-left: 1.2rem;
+        display: grid;
+        gap: 0.55rem;
+      }
+
+      .tech-pill {
         display: inline-flex;
         align-items: center;
         gap: 0.35rem;
-        padding: 0.35rem 0.75rem;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        background: rgba(148, 163, 184, 0.18);
+        padding: 0.4rem 0.85rem;
         border-radius: 999px;
-        border: 1px solid rgba(148, 163, 184, 0.3);
-        font-size: 0.8rem;
+      }
+
+      .stat-band {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 2.5rem;
+        margin-top: 3.5rem;
+      }
+
+      .stat {
         background: rgba(15, 23, 42, 0.55);
+        border-radius: 24px;
+        padding: 1.8rem;
+        border: 1px solid rgba(99, 102, 241, 0.22);
+        text-align: center;
       }
 
-      .notice {
-        font-size: 0.8rem;
-        opacity: 0.75;
-        margin: 0;
+      .stat strong {
+        display: block;
+        font-size: clamp(2rem, 5vw, 3rem);
+        font-weight: 700;
+        font-family: "Plus Jakarta Sans", "Inter", sans-serif;
       }
 
-      label {
-        font-size: 0.85rem;
-        font-weight: 600;
-        letter-spacing: 0.01em;
+      .testimonial-wrap {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 2rem;
       }
 
-      .dev-note {
-        font-size: 0.75rem;
-        opacity: 0.65;
-        margin: 0;
+      .testimonial {
+        background: rgba(15, 23, 42, 0.68);
+        border-radius: 24px;
+        padding: 2rem;
+        border: 1px solid rgba(244, 63, 94, 0.18);
+        position: relative;
       }
 
-      .error-message {
-        margin: 0;
-        font-size: 0.85rem;
-        color: #fca5a5;
+      .testimonial p {
+        font-size: 1.05rem;
+        line-height: 1.75;
+        margin: 0 0 1.5rem;
       }
 
-      pre {
-        margin: 0;
-        overflow: auto;
-        font-size: 0.85rem;
-        line-height: 1.5;
+      .testimonial span {
+        font-size: 0.9rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        opacity: 0.7;
+      }
+
+      .timeline {
+        display: grid;
+        gap: 1.8rem;
+        margin-top: 3rem;
+      }
+
+      .timeline-step {
+        display: grid;
+        grid-template-columns: minmax(120px, 220px) 1fr;
+        gap: 2rem;
+        align-items: start;
         background: rgba(15, 23, 42, 0.6);
-        border-radius: 12px;
-        padding: 0.75rem;
-        max-height: 360px;
+        padding: 1.8rem;
+        border-radius: 24px;
+        border: 1px solid rgba(148, 163, 184, 0.16);
       }
 
-      .log-list {
-        list-style: none;
-        padding: 0;
+      .timeline-step h3 {
         margin: 0;
+        font-size: 1rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        opacity: 0.75;
+      }
+
+      .timeline-step p {
+        margin: 0;
+        font-size: 1.05rem;
+        line-height: 1.7;
+        color: rgba(226, 232, 240, 0.84);
+      }
+
+      .pricing {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 2rem;
+      }
+
+      .pricing-card {
+        background: rgba(15, 23, 42, 0.7);
+        border-radius: 26px;
+        padding: 2.4rem 2rem;
+        border: 1px solid rgba(99, 102, 241, 0.2);
         display: flex;
         flex-direction: column;
-        gap: 0.5rem;
-        max-height: 320px;
-        overflow: auto;
+        gap: 1.5rem;
       }
 
-      .log-item {
-        font-family: "Iosevka", "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
-        font-size: 0.8rem;
-        white-space: pre-wrap;
-        word-break: break-word;
-        background: rgba(15, 23, 42, 0.55);
-        border-radius: 12px;
-        padding: 0.65rem;
+      .pricing-card.highlight {
+        border: 1px solid rgba(236, 72, 153, 0.45);
+        box-shadow: 0 40px 70px rgba(236, 72, 153, 0.25);
       }
 
-      #map {
-        width: 100%;
-        min-height: 320px;
-        height: clamp(320px, 35vw, 500px);
-        border-radius: 16px;
-        overflow: hidden;
-        border: 1px solid rgba(148, 163, 184, 0.18);
-        box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.35);
+      .pricing-card h3 {
+        font-size: 1.4rem;
+        margin: 0;
       }
 
-      .leaflet-container {
-        font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        background: rgba(15, 23, 42, 0.85);
+      .price-tag {
+        font-size: clamp(2rem, 4vw, 3rem);
+        font-weight: 700;
+        font-family: "Plus Jakarta Sans", "Inter", sans-serif;
       }
 
-      .map-orb {
-        width: 18px;
-        height: 18px;
-        border-radius: 999px;
-        background: radial-gradient(circle at center, rgba(251, 113, 133, 0.95) 0%, rgba(249, 115, 22, 0.85) 45%, rgba(15, 23, 42, 0) 70%);
-        box-shadow: 0 0 18px rgba(249, 115, 22, 0.8), 0 0 32px rgba(236, 72, 153, 0.65);
+      .pricing-card ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 0.9rem;
+        color: rgba(226, 232, 240, 0.85);
+        font-size: 0.95rem;
       }
 
-      footer {
-        opacity: 0.6;
-        font-size: 0.75rem;
+      .footer {
+        padding: 3rem clamp(1.5rem, 6vw, 6rem);
+        border-top: 1px solid rgba(148, 163, 184, 0.12);
         text-align: center;
+        color: rgba(226, 232, 240, 0.65);
+        font-size: 0.9rem;
+      }
+
+      .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(2, 6, 23, 0.72);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: clamp(1rem, 3vw, 2rem);
+        z-index: 10;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.3s ease;
+      }
+
+      .modal-backdrop.visible {
+        opacity: 1;
+        visibility: visible;
+      }
+
+      .modal {
+        width: min(90vw, 960px);
+        height: min(90vh, 780px);
+        background: rgba(15, 23, 42, 0.92);
+        border-radius: 32px;
+        border: 1px solid rgba(244, 63, 94, 0.4);
+        box-shadow: 0 60px 120px rgba(15, 23, 42, 0.85);
+        padding: clamp(2rem, 4vw, 3.5rem);
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+        position: relative;
+        overflow: hidden;
+        isolation: isolate;
+      }
+
+      .modal::before,
+      .modal::after {
+        content: "";
+        position: absolute;
+        border-radius: 999px;
+        filter: blur(0px);
+        pointer-events: none;
+      }
+
+      .modal::before {
+        width: 420px;
+        height: 420px;
+        background: radial-gradient(circle at center, rgba(244, 114, 182, 0.4), rgba(99, 102, 241, 0));
+        top: -120px;
+        right: -160px;
+      }
+
+      .modal::after {
+        width: 360px;
+        height: 360px;
+        background: radial-gradient(circle at center, rgba(249, 115, 22, 0.35), transparent 70%);
+        bottom: -140px;
+        left: -120px;
+      }
+
+      .modal h2 {
+        font-size: clamp(2rem, 4vw, 3.2rem);
+        margin: 0;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+      }
+
+      .modal p {
+        margin: 0;
+        font-size: clamp(1rem, 2.2vw, 1.2rem);
+        line-height: 1.8;
+        color: rgba(226, 232, 240, 0.88);
+      }
+
+      .modal-content {
+        display: grid;
+        gap: 1.4rem;
+        overflow-y: auto;
+      }
+
+      .modal-actions {
+        margin-top: auto;
+        display: flex;
+        justify-content: flex-end;
+      }
+
+      .modal-quote {
+        font-size: 1rem;
+        line-height: 1.7;
+        color: rgba(226, 232, 240, 0.75);
+        border-left: 3px solid rgba(244, 63, 94, 0.45);
+        padding-left: 1rem;
+      }
+
+      .logo-cloud {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1.8rem;
+        align-items: center;
+        opacity: 0.55;
+        text-transform: uppercase;
+        letter-spacing: 0.22em;
+        font-size: 0.75rem;
+      }
+
+      @media (max-width: 720px) {
+        .nav {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+
+        .nav-links {
+          flex-wrap: wrap;
+        }
+
+        .timeline-step {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation-duration: 0.001ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.001ms !important;
+          scroll-behavior: auto !important;
+        }
       }
     </style>
   </head>
   <body>
+    <div class="modal-backdrop" data-modal-backdrop hidden>
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" data-modal>
+        <div class="modal-content">
+          <span class="hero-badge">New from the mutterverse</span>
+          <h2 id="modal-title">Unpack your headspace into a globe-trotting AI confidant</h2>
+          <p>
+            You pace. You mutter. The concerns ricochet against the walls of your skull. Let muttr take the burden.
+            We ship every anxious note on a world tour of language models who pace, fret, and loop until clarity drops back into your lap.
+          </p>
+          <p class="modal-quote">
+            “We used to host daily venting standups. Now muttr’s relay does the muttering for us while the team ships.” — Ops lead, Starlight Freight
+          </p>
+          <p>
+            When you close this window you’ll meet a full-stack SaaS landing page ready to convince your boss, your procurement team, and the restless voice in your head.
+            Because sometimes the best way to quiet the inner monologue is to give it a passport and let it run laps around the planet.
+          </p>
+        </div>
+        <div class="modal-actions">
+          <button class="cta-button" type="button" data-close-modal>Unburden Yourself</button>
+        </div>
+      </div>
+    </div>
     <header>
-      <h1>muttr: the borderless todo telephone</h1>
-      <p>Everything you type goes on a global sightseeing tour through a daisy-chained LLM relay.</p>
+      <nav class="nav">
+        <div class="brand">muttr relay</div>
+        <div class="nav-links">
+          <a href="#features">Features</a>
+          <a href="#technology">Technology</a>
+          <a href="#method">How it Works</a>
+          <a href="#social-proof">Testimonials</a>
+          <a href="#pricing">Pricing</a>
+        </div>
+        <button class="pill-button" type="button" data-open-modal>Launch the Relay</button>
+      </nav>
     </header>
-
-    <main>
-      <section>
-        <h2>Place your concerns here</h2>
-        <textarea id="seed" placeholder="List the burdens weighing you down...">- Buy groceries
-- Eat lunch
-- Mow grass
-- Do Taxes</textarea>
-        <label for="update-input">Update your list</label>
-        <form id="update-form" class="stack">
-          <input
-            id="update-input"
-            class="text-input"
-            type="text"
-            placeholder="Share what changed since the last lap"
-            autocomplete="off"
-          />
-          <div class="controls">
-            <button type="submit" class="secondary-button">Submit update</button>
+    <main id="site-content">
+      <section class="hero">
+        <div class="hero-copy">
+          <div class="hero-badge">Let the AI do the pacing</div>
+          <h1>Give your worries a frequent flyer program.</h1>
+          <p>
+            Your brain doesn’t need another midnight sprint. muttr offloads the inner muttering to an orbiting relay of AI confidants, sending every concern on a passport-stamped world tour so you can stay focused on the work that matters.
+          </p>
+          <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+            <button class="cta-button" type="button" data-open-modal>See the Relay Ritual</button>
+            <button class="pill-button secondary" type="button">Download the deck</button>
           </div>
-        </form>
-        <div class="suggestion-buttons">
-          <button type="button" class="secondary-button suggestion-button" data-suggestion="I completed the first item">
-            I completed the first item
-          </button>
-          <button type="button" class="secondary-button suggestion-button" data-suggestion="And my cat needs to be spayed.">
-            And my cat needs to be spayed.
-          </button>
-          <button type="button" class="secondary-button suggestion-button" data-suggestion="Time is closing in on me">
-            Time is closing in on me
-          </button>
         </div>
-        <p class="dev-note" id="update-note">
-          Submitted updates are queued and will join the next hop in the circuit.
+        <aside class="hero-card">
+          <h2>The ritual in three breaths</h2>
+          <ul>
+            <li>
+              <strong>Whisper into muttr.</strong>
+              Drop every anxious task, scenario, or intrusive what-if into the relay. No formatting required.
+            </li>
+            <li>
+              <strong>Let the circuit pace.</strong>
+              Your burdens hitchhike across multiple hemispheres, where each persona refines and reports like a restless inner monologue.
+            </li>
+            <li>
+              <strong>Receive calm clarity.</strong>
+              muttr returns with prioritised next steps and a log of everywhere your burdens vacationed.
+            </li>
+          </ul>
+        </aside>
+      </section>
+
+      <section class="section" id="features">
+        <h2>Built for teams who think faster than their anxieties.</h2>
+        <p class="lead">
+          muttr is the only B2B platform that treats worry like operational debt. Offload the head-noise and let our relay of synthetic mutterers iterate until the signal is crystal clear.
         </p>
-        <p class="notice">
-          The loop always launches through the public muttr entry hop. Bring your own client if you need a private circuit.
-        </p>
-        <p id="error" class="error-message" hidden></p>
-        <div class="controls">
-          <button id="start">Start Global Loop</button>
-          <button id="stop" disabled>Stop</button>
-          <span class="badge">iteration: <span id="iterations">0</span></span>
-          <span class="badge">status: <span id="status">idle</span></span>
+        <div class="feature-grid">
+          <article class="feature-card">
+            <h3>Global concern choreography</h3>
+            <p>
+              Every whisper tours sunrise and sunset zones in a single lap. Your thoughts gain perspective while latency stays delightfully low.
+            </p>
+          </article>
+          <article class="feature-card">
+            <h3>Audit-ready muttering logs</h3>
+            <p>
+              Keep procurement happy with a narrative timeline of the relay’s pacing, complete with executive-ready annotations and decision rationales.
+            </p>
+          </article>
+          <article class="feature-card">
+            <h3>Anxiety load balancers</h3>
+            <p>
+              Smart load management keeps hot worries at the front of the queue while long-term dread simmers in the background.
+            </p>
+          </article>
+          <article class="feature-card">
+            <h3>Enterprise-grade catharsis</h3>
+            <p>
+              SOC 2-inspired safeguards meet a therapeutic level of overthinking. Finally, compliance and calm in a single platform.
+            </p>
+          </article>
+        </div>
+        <div class="stat-band">
+          <div class="stat">
+            <strong>92%</strong>
+            of customers report fewer hallway mutters after their first relay.
+          </div>
+          <div class="stat">
+            <strong>37 hrs</strong>
+            average weekly worry time returned to productive flow states.
+          </div>
+          <div class="stat">
+            <strong>Infinite laps</strong>
+            circling the globe so your brain doesn’t have to.
+          </div>
         </div>
       </section>
 
-      <section>
-        <h2>Assistant whisper</h2>
-        <pre id="assistant">(no assistant response yet)</pre>
+      <section class="section" id="technology">
+        <h2>The technology that keeps your AI concerns circling the globe.</h2>
+        <p class="lead">
+          Each whisper you upload embarks on a multi-region relay that feels impossibly advanced without ever exposing the wiring.
+          It’s the most efficient way to let software do the anxious walkabouts for you.
+        </p>
+        <div class="tech-grid">
+          <article class="tech-card">
+            <span class="tech-pill">Orbit fabric</span>
+            <h3>World-tour routing fabric</h3>
+            <p>
+              Concerns leave your browser, catch red-eye flights across friendly data skies, and return with postcards from every time zone.
+            </p>
+            <ul>
+              <li>Sunrise-to-sundown perspective resets on every lap</li>
+              <li>Pan-hemispheric pacing that keeps the energy moving</li>
+              <li>Hand-curated itinerary so latency feels like a deep breath</li>
+            </ul>
+          </article>
+          <article class="tech-card">
+            <span class="tech-pill">Signal cloud</span>
+            <h3>Mutterboard telemetry</h3>
+            <p>
+              Instead of packet captures, you get lush storytelling dashboards that prove the relay paced around the planet for you.
+            </p>
+            <ul>
+              <li>Color-coded pacing ribbons for leadership decks</li>
+              <li>Vibe-rich annotations that explain every reframing</li>
+              <li>Shareable proof that someone else is doing the worrying</li>
+            </ul>
+          </article>
+          <article class="tech-card">
+            <span class="tech-pill">Agentic relay</span>
+            <h3>Offload the muttering, reclaim the strategy</h3>
+            <p>
+              A roaming cast of AI handlers—so agentic, much wow—picks up the anxious thread before you can even start pacing.
+            </p>
+            <ul>
+              <li>Persona shifts keep every lap fresh</li>
+              <li>Ambient tone calibration for exec, ops, or founder mode</li>
+              <li>Pre-emptive pacing loops so plans arrive calm and complete</li>
+            </ul>
+          </article>
+        </div>
       </section>
 
-      <section>
-        <h2>Hop chain</h2>
-        <pre id="chain">(awaiting first run)</pre>
-        <h3>Hop log</h3>
-        <ul id="log" class="log-list"></ul>
+      <section class="section" id="method">
+        <h2>How muttr turns restless thoughts into decisive motion.</h2>
+        <p class="lead">
+          Our pacing playbook keeps concerns moving until they transmute into action. Every lap adds clarity, context, and courage.
+        </p>
+        <div class="timeline">
+          <div class="timeline-step">
+            <h3>01 • Capture</h3>
+            <p>
+              Feed muttr the stream-of-consciousness you would normally mumble while walking laps around the office. Raw is welcome.
+            </p>
+          </div>
+          <div class="timeline-step">
+            <h3>02 • Circulate</h3>
+            <p>
+              Each AI persona rephrases, reframes, and reprioritises. It’s your inner monologue, but now it has frequent flyer miles and a remit to deliver.
+            </p>
+          </div>
+          <div class="timeline-step">
+            <h3>03 • Clarify</h3>
+            <p>
+              The relay returns with an action plan, a synopsis, and a highlight reel of the muttering performed on your behalf.
+            </p>
+          </div>
+          <div class="timeline-step">
+            <h3>04 • Close the loop</h3>
+            <p>
+              Every concern loops back into the next relay run, meaning nothing lingers in your head longer than it wants to.
+            </p>
+          </div>
+        </div>
       </section>
 
-      <section>
-        <h2>Global hop map</h2>
-        <p class="dev-note">Each leg renders using the latest round trip timestamps. Watch the orb trace the last lap in real time.</p>
-        <div id="map" role="img" aria-label="World map showing the muttr hop path"></div>
+      <section class="section" id="social-proof">
+        <h2>Teams worldwide are letting muttr pace in their place.</h2>
+        <p class="lead">
+          Whether you’re shipping rocket telemetry or managing remote IT incidents, muttr keeps the background muttering productive and out of your skull.
+        </p>
+        <div class="logo-cloud">
+          <span>NovaOrbit</span>
+          <span>Permafrost Logistics</span>
+          <span>GlowStack Labs</span>
+          <span>Cobalt &amp; Co.</span>
+          <span>Riverly Finance</span>
+          <span>Synapse Yard</span>
+        </div>
+        <div class="testimonial-wrap">
+          <blockquote class="testimonial">
+            <p>
+              “muttr is the only vendor I’ve seen that understands the cost of a CTO muttering down the hallway. Our roadmap stays crisp because the relay never stops pacing for us.”
+            </p>
+            <span>Chief Product Officer · Glimmerworks</span>
+          </blockquote>
+          <blockquote class="testimonial">
+            <p>
+              “Customer escalations used to live in my head. Now I toss them into muttr, grab a coffee, and come back to a fully reasoned response drafted by an AI that already paced the lobby twice.”
+            </p>
+            <span>Director of CX · Nimbus Support</span>
+          </blockquote>
+          <blockquote class="testimonial">
+            <p>
+              “We replaced three parallel Slack rants with a single muttr loop. The AI mutters, we execute. Morale has never been higher.”
+            </p>
+            <span>Engineering Manager · Copperline Systems</span>
+          </blockquote>
+        </div>
       </section>
 
-      <section>
-        <h2>Raw OpenRouter JSON</h2>
-        <pre id="raw">(awaiting data)</pre>
+      <section class="section" id="pricing">
+        <h2>Choose how much muttering you want off your plate.</h2>
+        <p class="lead">
+          All plans include globe-spanning relays, audit trails, and a soothing sense that someone else is pacing on your behalf.
+        </p>
+        <div class="pricing">
+          <article class="pricing-card">
+            <h3>Starter</h3>
+            <div class="price-tag">$29</div>
+            <p>per mutterer / month</p>
+            <ul>
+              <li>Unlimited concern capture</li>
+              <li>Single relay chain</li>
+              <li>Weekly mutter summaries</li>
+            </ul>
+            <button class="pill-button secondary" type="button" data-open-modal>Book a trial</button>
+          </article>
+          <article class="pricing-card highlight">
+            <h3>Growth</h3>
+            <div class="price-tag">$79</div>
+            <p>per mutterer / month</p>
+            <ul>
+              <li>Dual relay circuits with failover</li>
+              <li>API access to muttering transcripts</li>
+              <li>Escalation routing for urgent anxieties</li>
+            </ul>
+            <button class="cta-button" type="button" data-open-modal>Talk to sales</button>
+          </article>
+          <article class="pricing-card">
+            <h3>Enterprise</h3>
+            <div class="price-tag">Let’s chat</div>
+            <p>bespoke calm pricing</p>
+            <ul>
+              <li>On-prem pacing compliance reviews</li>
+              <li>Private global pacing constellations</li>
+              <li>Dedicated chief muttering officer</li>
+            </ul>
+            <button class="pill-button secondary" type="button" data-open-modal>Schedule a briefing</button>
+          </article>
+        </div>
+      </section>
+
+      <section class="section" style="text-align: center;">
+        <h2>Ready to let your brain breathe?</h2>
+        <p class="lead" style="margin: 0 auto 2.5rem;">
+          Step into the relay. We’ll pace, mutter, and loop until your toughest worries report back with answers.
+        </p>
+        <button class="cta-button" type="button" data-open-modal>Initiate the next lap</button>
       </section>
     </main>
-
-    <footer>
-      <p>There is no storage. Only vibes. Powered by Azure Functions + OpenRouter.</p>
+    <footer class="footer">
+      muttr relays are powered by Azure Functions, OpenRouter, and an unhealthy commitment to doing the worrying for you.
+      There is still no database. Only vibes.
     </footer>
-
     <script>
-      const seed = document.querySelector('#seed');
-      const updateForm = document.querySelector('#update-form');
-      const updateInput = document.querySelector('#update-input');
-      const suggestionButtons = document.querySelectorAll('.suggestion-button');
-      const updateNote = document.querySelector('#update-note');
-      const startBtn = document.querySelector('#start');
-      const stopBtn = document.querySelector('#stop');
-      const iterationsEl = document.querySelector('#iterations');
-      const statusEl = document.querySelector('#status');
-      const assistantEl = document.querySelector('#assistant');
-      const chainEl = document.querySelector('#chain');
-      const logEl = document.querySelector('#log');
-      const rawEl = document.querySelector('#raw');
-      const errorEl = document.querySelector('#error');
-      const mapEl = document.querySelector('#map');
+      const body = document.body;
+      const backdrop = document.querySelector('[data-modal-backdrop]');
+      const modal = document.querySelector('[data-modal]');
+      const closeButton = document.querySelector('[data-close-modal]');
+      const openModalButtons = document.querySelectorAll('[data-open-modal]');
 
-      const HOP_COORDINATES = {
-        'muttr-us-east': { label: 'US East · Virginia, USA', lat: 37.505, lng: -77.320 },
-        'muttr-brazil': { label: 'Brazil · São Paulo', lat: -23.5505, lng: -46.6333 },
-        'muttr-uk': { label: 'United Kingdom · London', lat: 51.5072, lng: -0.1276 },
-        'muttr-singapore': { label: 'Singapore', lat: 1.3521, lng: 103.8198 },
-        'muttr-sydney': { label: 'Australia · Sydney', lat: -33.8688, lng: 151.2093 }
-      };
-
-      const mapState = {
-        map: null,
-        markers: new Map(),
-        routeLine: null,
-        orbMarker: null,
-        animationFrame: null,
-        hasFitBounds: false
-      };
-
-      function initMap() {
-        if (!mapEl || typeof L === 'undefined') {
-          return null;
-        }
-        if (mapState.map) {
-          return mapState.map;
-        }
-
-        mapState.map = L.map(mapEl, {
-          worldCopyJump: true,
-          attributionControl: false,
-          zoomControl: false
-        }).setView([15, 0], 2);
-
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-          maxZoom: 7,
-          subdomains: 'abcd'
-        }).addTo(mapState.map);
-
-        L.control.zoom({ position: 'bottomright' }).addTo(mapState.map);
-        ensureHopMarkers();
-        setTimeout(() => {
-          mapState.map.invalidateSize();
-        }, 200);
-        return mapState.map;
-      }
-
-      function ensureHopMarkers() {
-        if (!mapState.map) return;
-        Object.entries(HOP_COORDINATES).forEach(([key, detail]) => {
-          if (mapState.markers.has(key)) return;
-          const marker = L.circleMarker([detail.lat, detail.lng], {
-            radius: 6,
-            color: '#94a3b8',
-            weight: 1.2,
-            fillColor: '#94a3b8',
-            fillOpacity: 0.3,
-            opacity: 0.8
-          }).addTo(mapState.map);
-          marker.bindTooltip(`${detail.label}\n${key}`, { sticky: true });
-          mapState.markers.set(key, marker);
+      function showModal() {
+        if (!backdrop) return;
+        backdrop.hidden = false;
+        requestAnimationFrame(() => {
+          backdrop.classList.add('visible');
+          body.classList.add('modal-open');
         });
       }
 
-      function normalizeHopLogEntry(entry) {
-        if (!entry || typeof entry !== 'object') {
-          return null;
-        }
-        const hop = typeof entry.hop === 'string' ? entry.hop.trim() : '';
-        if (!hop || !HOP_COORDINATES[hop]) {
-          return null;
-        }
-        const detail = HOP_COORDINATES[hop];
-        const timestampMs = Date.parse(entry.timestamp);
-        return {
-          hop,
-          direction: typeof entry.direction === 'string' ? entry.direction : '',
-          timestamp: Number.isNaN(timestampMs) ? null : timestampMs,
-          lat: detail.lat,
-          lng: detail.lng,
-          label: detail.label
+      function hideModal() {
+        if (!backdrop) return;
+        backdrop.classList.remove('visible');
+        body.classList.remove('modal-open');
+        const handleTransitionEnd = () => {
+          backdrop.hidden = true;
+          backdrop.removeEventListener('transitionend', handleTransitionEnd);
         };
+        backdrop.addEventListener('transitionend', handleTransitionEnd, { once: true });
       }
 
-      function updateMapWithHopLog(entries) {
-        const map = initMap();
-        if (!map) {
-          return [];
-        }
-
-        const normalized = [];
-        if (Array.isArray(entries)) {
-          entries.forEach((entry) => {
-            const normalizedEntry = normalizeHopLogEntry(entry);
-            if (normalizedEntry) {
-              normalized.push(normalizedEntry);
-            }
-          });
-        }
-
-        const latLngs = normalized.map((point) => [point.lat, point.lng]);
-
-        if (latLngs.length > 0) {
-          if (!mapState.routeLine) {
-            mapState.routeLine = L.polyline(latLngs, {
-              color: '#38bdf8',
-              weight: 3,
-              opacity: 0.7,
-              dashArray: '10 8'
-            }).addTo(map);
-          } else {
-            mapState.routeLine.setLatLngs(latLngs);
-          }
-
-          if (!mapState.hasFitBounds && latLngs.length >= 2) {
-            map.fitBounds(L.latLngBounds(latLngs).pad(0.3));
-            mapState.hasFitBounds = true;
-          }
-        } else if (mapState.routeLine) {
-          mapState.routeLine.setLatLngs([]);
-        }
-
-        mapState.markers.forEach((marker) => {
-          marker.setStyle({
-            color: '#94a3b8',
-            fillColor: '#94a3b8',
-            fillOpacity: 0.3
-          });
-        });
-
-        normalized.forEach((point) => {
-          const marker = mapState.markers.get(point.hop);
-          if (marker) {
-            marker.setStyle({
-              color: '#f97316',
-              fillColor: '#f97316',
-              fillOpacity: 0.85
-            });
-          }
-        });
-
-        return normalized;
+      if (closeButton) {
+        closeButton.addEventListener('click', hideModal);
       }
 
-      function ensureOrbMarker(point) {
-        const map = initMap();
-        if (!map || !point) {
-          return null;
-        }
-
-        if (!mapState.orbMarker) {
-          const orbIcon = L.divIcon({ className: 'map-orb', iconSize: [18, 18] });
-          mapState.orbMarker = L.marker([point.lat, point.lng], {
-            icon: orbIcon,
-            interactive: false
-          }).addTo(map);
-        } else {
-          mapState.orbMarker.setLatLng([point.lat, point.lng]);
-          if (!map.hasLayer(mapState.orbMarker)) {
-            mapState.orbMarker.addTo(map);
-          }
-        }
-
-        mapState.orbMarker.setOpacity(1);
-        return mapState.orbMarker;
-      }
-
-      function hideOrbMarker() {
-        if (mapState.orbMarker) {
-          mapState.orbMarker.setOpacity(0);
-        }
-      }
-
-      function startOrbAnimation(routePoints) {
-        if (mapState.animationFrame) {
-          cancelAnimationFrame(mapState.animationFrame);
-          mapState.animationFrame = null;
-        }
-
-        const map = initMap();
-        if (!map || !Array.isArray(routePoints) || routePoints.length === 0) {
-          hideOrbMarker();
-          return;
-        }
-
-        if (routePoints.length === 1) {
-          ensureOrbMarker(routePoints[0]);
-          return;
-        }
-
-        const timeline = routePoints.filter((point) => Number.isFinite(point.timestamp));
-
-        if (timeline.length < 2) {
-          ensureOrbMarker(routePoints[routePoints.length - 1]);
-          return;
-        }
-
-        const segments = [];
-        let cumulative = 0;
-        for (let i = 1; i < timeline.length; i += 1) {
-          const prev = timeline[i - 1];
-          const current = timeline[i];
-          const duration = Math.max(current.timestamp - prev.timestamp, 1);
-          segments.push({
-            from: prev,
-            to: current,
-            start: cumulative,
-            duration,
-            end: cumulative + duration
-          });
-          cumulative += duration;
-        }
-
-        if (segments.length === 0) {
-          ensureOrbMarker(timeline[timeline.length - 1]);
-          return;
-        }
-
-        const orb = ensureOrbMarker(timeline[0]);
-        if (!orb) return;
-
-        const totalDuration = segments[segments.length - 1].end;
-        const animationStart = performance.now();
-
-        function step() {
-          const elapsed = performance.now() - animationStart;
-          if (elapsed >= totalDuration) {
-            const lastPoint = segments[segments.length - 1].to;
-            orb.setLatLng([lastPoint.lat, lastPoint.lng]);
-            mapState.animationFrame = null;
-            return;
-          }
-
-          const currentTime = elapsed;
-          let active = segments[0];
-          for (let i = 0; i < segments.length; i += 1) {
-            if (currentTime <= segments[i].end) {
-              active = segments[i];
-              break;
-            }
-          }
-
-          const progress = active.duration <= 0 ? 1 : (currentTime - active.start) / active.duration;
-          const clamped = Math.max(0, Math.min(1, progress));
-          const lat = active.from.lat + (active.to.lat - active.from.lat) * clamped;
-          const lng = active.from.lng + (active.to.lng - active.from.lng) * clamped;
-          orb.setLatLng([lat, lng]);
-          mapState.animationFrame = requestAnimationFrame(step);
-        }
-
-        mapState.animationFrame = requestAnimationFrame(step);
-      }
-
-      let running = false;
-      let iteration = 0;
-      let initialSeed = '';
-      let lastAssistantText = '';
-      const pendingUpdates = [];
-      const FIRST_HOP_URL = 'https://muttr-us-east.azurewebsites.net/api/muttr';
-      let currentEndpoint = FIRST_HOP_URL;
-
-      const baseUpdateNote = updateNote ? updateNote.textContent.trim() : '';
-
-      function refreshUpdateNote() {
-        if (!updateNote) return;
-        const count = pendingUpdates.length;
-        if (count === 0) {
-          updateNote.textContent = baseUpdateNote;
-        } else if (count === 1) {
-          updateNote.textContent = `${baseUpdateNote} (1 update queued)`;
-        } else {
-          updateNote.textContent = `${baseUpdateNote} (${count} updates queued)`;
-        }
-      }
-
-      refreshUpdateNote();
-
-      initMap();
-
-      function queueUpdate(text) {
-        const trimmed = typeof text === 'string' ? text.trim() : '';
-        if (!trimmed) {
-          return;
-        }
-        pendingUpdates.push(trimmed);
-        if (updateInput) {
-          updateInput.value = '';
-          updateInput.focus();
-        }
-        refreshUpdateNote();
-      }
-
-      function setStatus(text) {
-        statusEl.textContent = text;
-      }
-
-      function showError(message) {
-        if (message) {
-          errorEl.hidden = false;
-          errorEl.textContent = message;
-        } else {
-          errorEl.hidden = true;
-          errorEl.textContent = '';
-        }
-      }
-
-      function updateUI(result) {
-        if (!result) return [];
-        assistantEl.textContent = result.assistant_text || '(no assistant text)';
-        chainEl.textContent = result.hop_chain || '(no chain)';
-        rawEl.textContent = result.openrouter_response
-          ? JSON.stringify(result.openrouter_response, null, 2)
-          : '(no raw payload)';
-
-        logEl.innerHTML = '';
-        (result.hop_log || []).forEach((entry) => {
-          const li = document.createElement('li');
-          li.className = 'log-item';
-          li.textContent = JSON.stringify(entry, null, 2);
-          logEl.appendChild(li);
-        });
-
-        return updateMapWithHopLog(result.hop_log || []);
-      }
-
-      function buildRequestPayload() {
-        const primaryUserMessage =
-          iteration === 0
-            ? initialSeed
-            : lastAssistantText || '(previous assistant output unavailable)';
-
-        const queued = pendingUpdates.splice(0, pendingUpdates.length);
-        const messages = [{ role: 'user', content: primaryUserMessage }];
-
-        queued.forEach((content) => {
-          messages.push({ role: 'user', content });
-        });
-
-        refreshUpdateNote();
-
-        return JSON.stringify({
-          version: 1,
-          messages,
-          metadata: {
-            origin: 'muttr-ui',
-            iteration,
-            queued_updates: queued.length
+      if (backdrop) {
+        backdrop.addEventListener('click', (event) => {
+          if (event.target === event.currentTarget) {
+            hideModal();
           }
         });
       }
 
-      async function runOnce(payload) {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 60000);
-        try {
-          const response = await fetch(currentEndpoint, {
-            method: 'POST',
-            headers: {
-              'content-type': 'application/json; charset=utf-8',
-              'X-Direction': 'forward'
-            },
-            body: payload,
-            signal: controller.signal,
-            mode: 'cors',
-            credentials: 'omit'
-          });
-
-          if (!response.ok) {
-            const text = await response.text();
-            throw new Error(`Hop failed: ${response.status} ${text}`);
-          }
-
-          const result = await response.json();
-          return result;
-        } catch (error) {
-          throw error;
-        } finally {
-          clearTimeout(timeout);
-        }
-      }
-
-      async function loop() {
-        if (!running) return;
-        setStatus('in-flight');
-        try {
-          const payload = buildRequestPayload();
-          const result = await runOnce(payload);
-          iteration += 1;
-          iterationsEl.textContent = iteration;
-          lastAssistantText = result && result.assistant_text ? result.assistant_text : '';
-          const routePoints = updateUI(result);
-          showError('');
-          if (!running) return;
-          setStatus('waiting');
-          startOrbAnimation(routePoints);
-          requestAnimationFrame(loop);
-        } catch (error) {
-          console.error(error);
-          setStatus('error');
-          showError(error.message || 'Unknown error while calling the hop endpoint.');
-          startBtn.disabled = false;
-          stopBtn.disabled = true;
-          running = false;
-        }
-      }
-
-      if (updateForm) {
-        updateForm.addEventListener('submit', (event) => {
-          event.preventDefault();
-          if (!updateInput) return;
-          queueUpdate(updateInput.value);
+      if (modal) {
+        modal.addEventListener('click', (event) => {
+          event.stopPropagation();
         });
       }
 
-      suggestionButtons.forEach((button) => {
-        button.addEventListener('click', () => {
-          const suggestion = button.dataset.suggestion || button.textContent || '';
-          queueUpdate(suggestion);
-        });
+      openModalButtons.forEach((button) => {
+        button.addEventListener('click', showModal);
       });
 
-      startBtn.addEventListener('click', () => {
-        if (running) return;
-        running = true;
-        iteration = 0;
-        initialSeed = seed.value.trim() || '(empty seed)';
-        lastAssistantText = '';
-        iterationsEl.textContent = '0';
-        startBtn.disabled = true;
-        stopBtn.disabled = false;
-        showError('');
-        setStatus('booting');
-        if (mapState.animationFrame) {
-          cancelAnimationFrame(mapState.animationFrame);
-          mapState.animationFrame = null;
-        }
-        hideOrbMarker();
-        loop();
-      });
+      const launchModalOnLoad = () => showModal();
 
-      stopBtn.addEventListener('click', () => {
-        running = false;
-        startBtn.disabled = false;
-        stopBtn.disabled = true;
-        setStatus('stopped');
-        if (mapState.animationFrame) {
-          cancelAnimationFrame(mapState.animationFrame);
-          mapState.animationFrame = null;
+      window.addEventListener('DOMContentLoaded', launchModalOnLoad);
+      window.addEventListener('pageshow', (event) => {
+        if (event.persisted) {
+          launchModalOnLoad();
         }
-        hideOrbMarker();
       });
     </script>
   </body>
