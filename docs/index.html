@@ -69,8 +69,27 @@
         min-height: 120px;
       }
 
-      textarea.system-input {
-        min-height: 180px;
+      .text-input {
+        width: 100%;
+        padding: 0.75rem;
+        border-radius: 12px;
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        background: rgba(15, 23, 42, 0.6);
+        color: inherit;
+        font-size: 0.95rem;
+        line-height: 1.4;
+        font-family: "Iosevka", "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+      }
+
+      .suggestion-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 0.25rem;
+      }
+
+      .suggestion-buttons button {
+        white-space: nowrap;
       }
 
       button {
@@ -205,35 +224,38 @@
 
     <main>
       <section>
-        <h2>Seed the chaos</h2>
-        <textarea id="seed" placeholder="Plant your initial todo vibe here...">- plan launch party
-- check rocket fuel levels
-- convince the parrot we're serious explorers</textarea>
-        <label for="burden">Modify the burden</label>
-        <textarea
-          id="burden"
-          class="compact"
-          placeholder="Optional: add a fresh constraint or twist for the next hop"
-        ></textarea>
-        <p class="dev-note">
-          When populated, the modifier is sent as a second user message on the next loop.
-        </p>
-        <div class="controls">
-          <button id="toggle-system" type="button" class="secondary-button">
-            Show system prompt editor
+        <h2>Place your concerns here</h2>
+        <textarea id="seed" placeholder="List the burdens weighing you down...">- Buy groceries
+- Eat lunch
+- Mow grass
+- Do Taxes</textarea>
+        <label for="update-input">Update your list</label>
+        <form id="update-form" class="stack">
+          <input
+            id="update-input"
+            class="text-input"
+            type="text"
+            placeholder="Share what changed since the last lap"
+            autocomplete="off"
+          />
+          <div class="controls">
+            <button type="submit" class="secondary-button">Submit update</button>
+          </div>
+        </form>
+        <div class="suggestion-buttons">
+          <button type="button" class="secondary-button suggestion-button" data-suggestion="I completed the first item">
+            I completed the first item
+          </button>
+          <button type="button" class="secondary-button suggestion-button" data-suggestion="And my cat needs to be spayed.">
+            And my cat needs to be spayed.
+          </button>
+          <button type="button" class="secondary-button suggestion-button" data-suggestion="Time is closing in on me">
+            Time is closing in on me
           </button>
         </div>
-        <div id="system-editor" class="stack" hidden>
-          <label for="system-prompt">System prompt</label>
-          <textarea
-            id="system-prompt"
-            class="system-input"
-            placeholder="Define how the relay should behave"
-          >You are a chaotic todo-list game of telephone. Repeat and mutate this list as you see fit.</textarea>
-          <p class="dev-note">
-            ⚠️ Dev-only feature: edits live solely in this browser session and ship straight to OpenRouter.
-          </p>
-        </div>
+        <p class="dev-note" id="update-note">
+          Submitted updates are queued and will join the next hop in the circuit.
+        </p>
         <p class="notice">
           The loop always launches through the public muttr entry hop. Bring your own client if you need a private circuit.
         </p>
@@ -270,10 +292,10 @@
 
     <script>
       const seed = document.querySelector('#seed');
-      const burden = document.querySelector('#burden');
-      const systemEditor = document.querySelector('#system-editor');
-      const systemPromptInput = document.querySelector('#system-prompt');
-      const toggleSystemBtn = document.querySelector('#toggle-system');
+      const updateForm = document.querySelector('#update-form');
+      const updateInput = document.querySelector('#update-input');
+      const suggestionButtons = document.querySelectorAll('.suggestion-button');
+      const updateNote = document.querySelector('#update-note');
       const startBtn = document.querySelector('#start');
       const stopBtn = document.querySelector('#stop');
       const iterationsEl = document.querySelector('#iterations');
@@ -284,19 +306,42 @@
       const rawEl = document.querySelector('#raw');
       const errorEl = document.querySelector('#error');
 
-      const DEFAULT_SYSTEM_PROMPT =
-        'You are a chaotic todo-list game of telephone. Repeat and mutate this list as you see fit.';
-
-      if (!systemPromptInput.value.trim()) {
-        systemPromptInput.value = DEFAULT_SYSTEM_PROMPT;
-      }
-
       let running = false;
       let iteration = 0;
       let initialSeed = '';
       let lastAssistantText = '';
+      const pendingUpdates = [];
       const FIRST_HOP_URL = 'https://muttr-us-east.azurewebsites.net/api/muttr';
       let currentEndpoint = FIRST_HOP_URL;
+
+      const baseUpdateNote = updateNote ? updateNote.textContent.trim() : '';
+
+      function refreshUpdateNote() {
+        if (!updateNote) return;
+        const count = pendingUpdates.length;
+        if (count === 0) {
+          updateNote.textContent = baseUpdateNote;
+        } else if (count === 1) {
+          updateNote.textContent = `${baseUpdateNote} (1 update queued)`;
+        } else {
+          updateNote.textContent = `${baseUpdateNote} (${count} updates queued)`;
+        }
+      }
+
+      refreshUpdateNote();
+
+      function queueUpdate(text) {
+        const trimmed = typeof text === 'string' ? text.trim() : '';
+        if (!trimmed) {
+          return;
+        }
+        pendingUpdates.push(trimmed);
+        if (updateInput) {
+          updateInput.value = '';
+          updateInput.focus();
+        }
+        refreshUpdateNote();
+      }
 
       function setStatus(text) {
         statusEl.textContent = text;
@@ -330,28 +375,27 @@
       }
 
       function buildRequestPayload() {
-        const systemPrompt = systemPromptInput.value.trim() || DEFAULT_SYSTEM_PROMPT;
-        const modifier = burden.value.trim();
         const primaryUserMessage =
           iteration === 0
             ? initialSeed
             : lastAssistantText || '(previous assistant output unavailable)';
 
-        const messages = [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: primaryUserMessage }
-        ];
+        const queued = pendingUpdates.splice(0, pendingUpdates.length);
+        const messages = [{ role: 'user', content: primaryUserMessage }];
 
-        if (modifier) {
-          messages.push({ role: 'user', content: modifier });
-        }
+        queued.forEach((content) => {
+          messages.push({ role: 'user', content });
+        });
+
+        refreshUpdateNote();
 
         return JSON.stringify({
           version: 1,
           messages,
           metadata: {
             origin: 'muttr-ui',
-            iteration
+            iteration,
+            queued_updates: queued.length
           }
         });
       }
@@ -410,6 +454,21 @@
         }
       }
 
+      if (updateForm) {
+        updateForm.addEventListener('submit', (event) => {
+          event.preventDefault();
+          if (!updateInput) return;
+          queueUpdate(updateInput.value);
+        });
+      }
+
+      suggestionButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+          const suggestion = button.dataset.suggestion || button.textContent || '';
+          queueUpdate(suggestion);
+        });
+      });
+
       startBtn.addEventListener('click', () => {
         if (running) return;
         running = true;
@@ -429,17 +488,6 @@
         startBtn.disabled = false;
         stopBtn.disabled = true;
         setStatus('stopped');
-      });
-
-      toggleSystemBtn.addEventListener('click', () => {
-        const isHidden = systemEditor.hasAttribute('hidden');
-        if (isHidden) {
-          systemEditor.hidden = false;
-          toggleSystemBtn.textContent = 'Hide system prompt editor';
-        } else {
-          systemEditor.hidden = true;
-          toggleSystemBtn.textContent = 'Show system prompt editor';
-        }
       });
     </script>
   </body>
