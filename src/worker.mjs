@@ -241,7 +241,7 @@ const html = `<!DOCTYPE html>
 
           if (!response.ok) {
             const text = await response.text();
-            throw new Error(`Hop failed: ${response.status} ${text}`);
+            throw new Error('Hop failed: ' + response.status + ' ' + text);
           }
 
           const result = await response.json();
