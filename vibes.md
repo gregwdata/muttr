@@ -63,6 +63,7 @@ Legacy Cloudflare Worker prototype retained for historical reference. No longer 
 
 ## 🛠 Implementation Log
 
+- **2025-02-28** – Removed the hop-level artificial delay so telemetry reflects true network latency, and upgraded the UI with a Leaflet-powered world map plus real-time orb animation that replays each completed lap.
 - **2025-02-27** – Moved the system prompt definition out of the UI and into the Azure Function, refreshed the default concerns, and rebuilt the web client inputs to queue list updates with suggestion buttons.
 - **2025-02-26** – Gated the Azure Functions deployment workflow behind path filters and pushed full OpenRouter prompt control into the UI with a dev-only system prompt editor plus a "modify the burden" injector.
 
