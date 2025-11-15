@@ -149,6 +149,16 @@ jobs:
               --setting-names OPENROUTER_API_KEY OPENROUTER_MODEL >/dev/null 2>&1 || true
           fi
 
+      - name: Configure CORS
+        run: |
+          APP_NAME="${{ matrix.hop.name }}"
+
+          az functionapp cors set \
+            --subscription "$AZURE_SUBSCRIPTION_ID" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "$APP_NAME" \
+            --allowed-origins https://gregwdata.github.io https://muttr.materialmachinelearn.ing
+
       - name: Deploy to Azure Functions
         uses: Azure/functions-action@v1
         with:
