@@ -1,0 +1,71 @@
+name: Deploy muttr UI to Cloudflare Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'README.md'
+      - 'vibes.md'
+      - '.github/workflows/deploy-ui-cloudflare.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-ui-cloudflare
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Publish UI
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Publish to Cloudflare Pages
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: muttr-ui
+          directory: docs
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+          branch: main
+
+      - name: Ensure custom domain is configured
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_PAGES_PROJECT: muttr-ui
+          CUSTOM_DOMAIN: muttr.materialmachinelearn.ing
+        run: |
+          set -euo pipefail
+          API_BASE="https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/${CLOUDFLARE_PAGES_PROJECT}/domains"
+          AUTH_HEADER="Authorization: Bearer ${CLOUDFLARE_API_TOKEN}"
+          BODY="{\"name\":\"${CUSTOM_DOMAIN}\"}"
+
+          put_status=$(curl -sS -o response.json -w "%{http_code}" \
+            -X PUT "${API_BASE}/${CUSTOM_DOMAIN}" \
+            -H "${AUTH_HEADER}" \
+            -H "Content-Type: application/json" \
+            --data "${BODY}")
+
+          if [[ "${put_status}" == "404" ]]; then
+            post_status=$(curl -sS -o response.json -w "%{http_code}" \
+              -X POST "${API_BASE}" \
+              -H "${AUTH_HEADER}" \
+              -H "Content-Type: application/json" \
+              --data "${BODY}")
+            if [[ "${post_status}" -ge 400 ]]; then
+              cat response.json >&2
+              exit 1
+            fi
+          elif [[ "${put_status}" -ge 400 ]]; then
+            cat response.json >&2
+            exit 1
+          fi
+
+          cat response.json

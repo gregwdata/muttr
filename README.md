@@ -48,7 +48,7 @@ src/worker.mjs     # Legacy Cloudflare Worker prototype (kept for reference)
 docs/index.html    # Static UI that can target the first hop endpoint
 ```
 
-The Cloudflare Worker script is still present for posterity but no longer powers the live relay.
+The Cloudflare Worker script is still present for posterity but no longer powers the live relay. The public UI now deploys to **Cloudflare Pages** at [`https://muttr.materialmachinelearn.ing`](https://muttr.materialmachinelearn.ing), which simply hosts the static client in `docs/`.
 
 ---
 
@@ -120,6 +120,19 @@ Set environment variables before starting (e.g. `HOP_NAME`, `NEXT_HOP_URL`). You
 4. Watch the assistant text mutate, the hop chain grow, and the raw OpenRouter JSON scroll by.
 
 Every response is immediately sent back into the relay, so the loop keeps running until you press **Stop**.
+
+---
+
+## ☁️ Deploying the UI to Cloudflare Pages
+
+The static interface in `docs/` is automatically published to Cloudflare Pages so it can run under the custom domain `muttr.materialmachinelearn.ing` without fighting GitHub Pages CORS limitations.
+
+1. **Secrets** – Store `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` in the repository settings. The token needs permission to manage Pages projects and custom domains for the target account.
+2. **Workflow** – `.github/workflows/deploy-ui-cloudflare.yml` checks out the repo, uploads `docs/` with `cloudflare/pages-action@v1`, and then ensures the custom domain exists (creating it if necessary).
+3. **Triggers** – Any push to `main` that touches the UI, the README, the workflow, or `vibes.md` will redeploy. You can also use the manual **Run workflow** button.
+4. **DNS** – Point `muttr.materialmachinelearn.ing` at the Cloudflare Pages project per Cloudflare’s instructions (typically a CNAME to `<project>.pages.dev`). The workflow call to the Cloudflare API keeps the association in sync.
+
+Once the workflow finishes, the UI is live at [`https://muttr.materialmachinelearn.ing`](https://muttr.materialmachinelearn.ing). Update the endpoint field in the page if you are running your own hop chain instead of the default Azure deployment.
 
 ---
 
