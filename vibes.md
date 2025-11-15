@@ -590,3 +590,5 @@ wrangler deploy --env sydney
 - **2025-02-15** – Drafted the top-level `README.md` with Cloudflare deployment steps and a sample GitHub Actions workflow for continuous relay releases.
 - **2025-02-16** – Checked in the real `.github/workflows/cloudflare-relay-deploy.yml` so pushes to `main` can automatically redeploy every Cloudflare hop.
 - **2025-02-16** – Materialized `wrangler.toml` in-repo and pointed the README instructions at it so GitHub Actions deployments have a real config to consume.
+
+- **2025-02-16** – Fixed `wrangler.toml` environment variable sections to use proper TOML tables so GitHub Actions deployments parse cleanly.

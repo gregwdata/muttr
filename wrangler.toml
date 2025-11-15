@@ -3,45 +3,40 @@ main = "src/worker.mjs"
 compatibility_date = "2024-11-01"
 
 [env.us_east]
-vars = {
-  HOP_NAME = "us-east-hop",
-  NEXT_HOP_URL = "https://brazil.YOURDOMAIN.COM",
-  DELAY_MS = "100"
-}
 routes = ["us-east.YOURDOMAIN.COM/*"]
+[env.us_east.vars]
+HOP_NAME = "us-east-hop"
+NEXT_HOP_URL = "https://brazil.YOURDOMAIN.COM"
+DELAY_MS = "100"
 
 [env.brazil]
-vars = {
-  HOP_NAME = "brazil-hop",
-  NEXT_HOP_URL = "https://uk.YOURDOMAIN.COM",
-  PREV_HOP_URL = "https://us-east.YOURDOMAIN.COM",
-  DELAY_MS = "150"
-}
 routes = ["brazil.YOURDOMAIN.COM/*"]
+[env.brazil.vars]
+HOP_NAME = "brazil-hop"
+NEXT_HOP_URL = "https://uk.YOURDOMAIN.COM"
+PREV_HOP_URL = "https://us-east.YOURDOMAIN.COM"
+DELAY_MS = "150"
 
 [env.uk]
-vars = {
-  HOP_NAME = "uk-hop",
-  NEXT_HOP_URL = "https://singapore.YOURDOMAIN.COM",
-  PREV_HOP_URL = "https://brazil.YOURDOMAIN.COM",
-  DELAY_MS = "200"
-}
 routes = ["uk.YOURDOMAIN.COM/*"]
+[env.uk.vars]
+HOP_NAME = "uk-hop"
+NEXT_HOP_URL = "https://singapore.YOURDOMAIN.COM"
+PREV_HOP_URL = "https://brazil.YOURDOMAIN.COM"
+DELAY_MS = "200"
 
 [env.singapore]
-vars = {
-  HOP_NAME = "singapore-hop",
-  NEXT_HOP_URL = "https://sydney.YOURDOMAIN.COM",
-  PREV_HOP_URL = "https://uk.YOURDOMAIN.COM",
-  DELAY_MS = "300"
-}
 routes = ["singapore.YOURDOMAIN.COM/*"]
+[env.singapore.vars]
+HOP_NAME = "singapore-hop"
+NEXT_HOP_URL = "https://sydney.YOURDOMAIN.COM"
+PREV_HOP_URL = "https://uk.YOURDOMAIN.COM"
+DELAY_MS = "300"
 
 [env.sydney]
-vars = {
-  HOP_NAME = "sydney-hop",
-  PREV_HOP_URL = "https://singapore.YOURDOMAIN.COM",
-  DELAY_MS = "400",
-  OPENROUTER_MODEL = "openai/gpt-4o-mini"
-}
 routes = ["sydney.YOURDOMAIN.COM/*"]
+[env.sydney.vars]
+HOP_NAME = "sydney-hop"
+PREV_HOP_URL = "https://singapore.YOURDOMAIN.COM"
+DELAY_MS = "400"
+OPENROUTER_MODEL = "openai/gpt-4o-mini"
