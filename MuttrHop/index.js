@@ -42,7 +42,39 @@ module.exports = async function (context, req) {
   const hopLabel = `${HOP_NAME}(${direction})`;
   const newChain = hopsSoFar ? `${hopsSoFar},${hopLabel}` : hopLabel;
 
-  const prevLog = req.headers["x-hop-log"] || "";
+  function parseHopLogHeader(value) {
+    if (!value) {
+      return [];
+    }
+
+    let stringValue = value;
+    if (Array.isArray(stringValue)) {
+      stringValue = stringValue.join("\n");
+    }
+
+    stringValue = String(stringValue).trim();
+    if (!stringValue) {
+      return [];
+    }
+
+    try {
+      const parsed = JSON.parse(stringValue);
+      if (Array.isArray(parsed)) {
+        return parsed.map((entry) =>
+          typeof entry === "string" ? entry : JSON.stringify(entry)
+        );
+      }
+    } catch (err) {
+      // Not JSON – fall back to newline-delimited parsing below.
+    }
+
+    return stringValue
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+  }
+
+  const prevLogLines = parseHopLogHeader(req.headers["x-hop-log"]);
   const currentHopLogLine = JSON.stringify({
     hop: HOP_NAME,
     direction,
@@ -51,7 +83,8 @@ module.exports = async function (context, req) {
     chain: newChain,
     timestamp: new Date().toISOString()
   });
-  const newLog = prevLog ? `${prevLog}\n${currentHopLogLine}` : currentHopLogLine;
+  const newLogLines = [...prevLogLines, currentHopLogLine];
+  const newLogHeader = JSON.stringify(newLogLines);
 
   context.log(currentHopLogLine);
 
@@ -63,7 +96,7 @@ module.exports = async function (context, req) {
     const headers = {
       "Content-Type": "text/plain",
       "X-Hop-Chain": newChain,
-      "X-Hop-Log": newLog,
+      "X-Hop-Log": newLogHeader,
       "X-Direction": newDirection
     };
 
@@ -76,12 +109,17 @@ module.exports = async function (context, req) {
       });
     } catch (err) {
       context.log.error(`Failed to contact hop ${targetUrl}:`, err);
+      const errorLogLines = [
+        ...newLogLines,
+        JSON.stringify({ error: String(err) })
+      ];
+      const errorLogHeader = JSON.stringify(errorLogLines);
       setResponse(
         502,
         {
           "Content-Type": "text/plain",
           "X-Hop-Chain": newChain,
-          "X-Hop-Log": `${newLog}\n${JSON.stringify({ error: String(err) })}`
+          "X-Hop-Log": errorLogHeader
         },
         `Failed to reach hop at ${targetUrl}`
       );
@@ -90,7 +128,11 @@ module.exports = async function (context, req) {
 
     const text = await resp.text();
     const respHopChain = resp.headers.get("x-hop-chain") || newChain;
-    const respHopLog = resp.headers.get("x-hop-log") || newLog;
+    const respHopLogLines = parseHopLogHeader(resp.headers.get("x-hop-log"));
+    const respHopLog =
+      respHopLogLines.length > 0
+        ? JSON.stringify(respHopLogLines)
+        : newLogHeader;
 
     setResponse(
       resp.status,
@@ -141,12 +183,17 @@ module.exports = async function (context, req) {
       });
     } catch (err) {
       context.log.error("OpenRouter call failed:", err);
+      const errorLogLines = [
+        ...newLogLines,
+        JSON.stringify({ error: String(err) })
+      ];
+      const errorLogHeader = JSON.stringify(errorLogLines);
       setResponse(
         502,
         {
           "Content-Type": "text/plain",
           "X-Hop-Chain": newChain,
-          "X-Hop-Log": `${newLog}\n${JSON.stringify({ error: String(err) })}`
+          "X-Hop-Log": errorLogHeader
         },
         "Failed to reach OpenRouter"
       );
@@ -164,7 +211,7 @@ module.exports = async function (context, req) {
       {
         "Content-Type": "application/json",
         "X-Hop-Chain": newChain,
-        "X-Hop-Log": newLog
+        "X-Hop-Log": newLogHeader
       },
       orText
     );
@@ -206,7 +253,7 @@ module.exports = async function (context, req) {
       {
         phase: "completed-there-and-back",
         hop_chain: newChain,
-        hop_log: newLog.split("\n").map((line) => {
+        hop_log: newLogLines.map((line) => {
           try {
             return JSON.parse(line);
           } catch (err) {
@@ -225,7 +272,7 @@ module.exports = async function (context, req) {
       {
         "Content-Type": "application/json",
         "X-Hop-Chain": newChain,
-        "X-Hop-Log": newLog
+        "X-Hop-Log": newLogHeader
       },
       responseBody
     );

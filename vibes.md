@@ -63,6 +63,7 @@ Legacy Cloudflare Worker prototype retained for historical reference. No longer 
 
 ## 🛠 Implementation Log
 
+- **2025-02-23** – Sanitized hop log headers to JSON-encode the log entries so Azure Functions no longer attempts to send newline-delimited strings that Undici rejects.
 - **2025-02-22** – Updated the deployment workflow to check existing Function App CORS origins before adding the GitHub Pages and Cloudflare hosts so repeated runs stay idempotent.
 - **2025-02-22** – Fixed the Cloudflare Pages deployment to verify the custom domain on the correct project before creating it, keeping the step idempotent and aligned with the live site.
 - **2025-02-21** – Locked the browser UI to the public US East entry hop, hid the endpoint selector, and taught the Azure deployment workflow to set CORS for the GitHub Pages and Cloudflare origins.
