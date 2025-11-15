@@ -10,17 +10,8 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;700&display=swap"
       rel="stylesheet"
     />
-    <link
-      rel="stylesheet"
-      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-      integrity="sha256-o9N1j7kCpk//4cw3AV2uy1S8MaqkOawx2UY8ailqXFw="
-      crossorigin=""
-    />
-    <script
-      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-      integrity="sha256-XQoYMqMTK8LvdlDXvxdgZGH5f9s74pNgMDwWv6f5pFg="
-      crossorigin=""
-    ></script>
+    <script src="https://code.highcharts.com/highcharts.js"></script>
+    <script src="https://code.highcharts.com/maps/modules/map.js"></script>
     <style>
       html {
         scroll-behavior: smooth;
@@ -705,22 +696,17 @@
         box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.35);
       }
 
-      .relay-app .leaflet-container {
+      #relay-map .highcharts-container {
         font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        background: rgba(15, 23, 42, 0.85);
       }
 
-      .relay-app .map-orb {
-        width: 18px;
-        height: 18px;
-        border-radius: 999px;
-        background: radial-gradient(
-          circle at center,
-          rgba(251, 113, 133, 0.95) 0%,
-          rgba(249, 115, 22, 0.85) 45%,
-          rgba(15, 23, 42, 0) 70%
-        );
-        box-shadow: 0 0 18px rgba(249, 115, 22, 0.8), 0 0 32px rgba(236, 72, 153, 0.65);
+      #relay-map .highcharts-background,
+      #relay-map .highcharts-plot-background {
+        fill: rgba(2, 6, 23, 0.9);
+      }
+
+      #relay-map .highcharts-mapline-series .highcharts-graph {
+        filter: drop-shadow(0 0 8px rgba(250, 204, 21, 0.35));
       }
 
       .relay-app__footer {
@@ -1327,56 +1313,232 @@
         };
 
         const mapState = {
-          map: null,
-          markers: new Map(),
-          routeLine: null,
-          orbMarker: null,
+          chart: null,
+          readyPromise: null,
+          topologyPromise: null,
           animationFrame: null,
-          hasFitBounds: false
+          animationToken: 0
         };
 
-        function initMap() {
-          if (!mapEl || typeof L === 'undefined') {
-            return null;
+        function loadWorldTopology() {
+          if (!mapState.topologyPromise) {
+            mapState.topologyPromise = fetch('https://code.highcharts.com/mapdata/custom/world.topo.json')
+              .then((response) => response.json())
+              .catch((error) => {
+                console.error('Failed to fetch Highcharts map data', error);
+                mapState.topologyPromise = null;
+                return null;
+              });
           }
-          if (mapState.map) {
-            return mapState.map;
-          }
-
-          mapState.map = L.map(mapEl, {
-            worldCopyJump: true,
-            attributionControl: false,
-            zoomControl: false
-          }).setView([15, 0], 2);
-
-          L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            maxZoom: 7,
-            subdomains: 'abcd'
-          }).addTo(mapState.map);
-
-          L.control.zoom({ position: 'bottomright' }).addTo(mapState.map);
-          ensureHopMarkers();
-          setTimeout(() => {
-            mapState.map.invalidateSize();
-          }, 200);
-          return mapState.map;
+          return mapState.topologyPromise;
         }
 
-        function ensureHopMarkers() {
-          if (!mapState.map) return;
-          Object.entries(HOP_COORDINATES).forEach(([key, detail]) => {
-            if (mapState.markers.has(key)) return;
-            const marker = L.circleMarker([detail.lat, detail.lng], {
-              radius: 6,
-              color: '#94a3b8',
-              weight: 1.2,
-              fillColor: '#94a3b8',
-              fillOpacity: 0.3,
-              opacity: 0.8
-            }).addTo(mapState.map);
-            marker.bindTooltip(`${detail.label}\n${key}`, { sticky: true });
-            mapState.markers.set(key, marker);
+        async function initMap() {
+          if (!mapEl || typeof Highcharts === 'undefined') {
+            return null;
+          }
+          if (mapState.chart) {
+            return mapState.chart;
+          }
+          if (!mapState.readyPromise) {
+            mapState.readyPromise = loadWorldTopology()
+              .then((topology) => {
+                if (!topology || !topology.objects) {
+                  return null;
+                }
+
+                const defaultHop = HOP_COORDINATES['muttr-us-east'];
+                const hopData = buildHopSeriesData(new Set());
+
+                mapState.chart = Highcharts.mapChart(mapEl, {
+                  chart: {
+                    map: topology,
+                    backgroundColor: 'transparent',
+                    style: {
+                      fontFamily: '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+                    }
+                  },
+                  title: { text: null },
+                  legend: { enabled: false },
+                  credits: { enabled: false },
+                  mapNavigation: {
+                    enabled: true,
+                    buttonOptions: {
+                      align: 'right',
+                      verticalAlign: 'bottom',
+                      theme: {
+                        fill: 'rgba(15, 23, 42, 0.85)',
+                        stroke: 'rgba(148, 163, 184, 0.3)',
+                        'stroke-width': 0.5,
+                        style: { color: '#f8fafc' },
+                        states: {
+                          hover: {
+                            fill: '#f97316',
+                            style: { color: '#0f172a' }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  tooltip: {
+                    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                    borderColor: 'rgba(148, 163, 184, 0.35)',
+                    style: { color: '#f8fafc' },
+                    useHTML: true,
+                    formatter: function tooltipFormatter() {
+                      if (this.series && this.series.userOptions && this.series.userOptions.id === 'orb-series') {
+                        return '<strong>Relay orb</strong><br/>Currently in-flight';
+                      }
+                      if (this.point && this.point.name) {
+                        return `<strong>${this.point.name}</strong>`;
+                      }
+                      return '';
+                    }
+                  },
+                  series: [
+                    {
+                      type: 'map',
+                      name: 'World',
+                      mapData: topology,
+                      nullColor: '#0f172a',
+                      borderColor: 'rgba(148, 163, 184, 0.25)',
+                      borderWidth: 0.4
+                    },
+                    {
+                      type: 'mappoint',
+                      id: 'hop-series',
+                      name: 'Relay hops',
+                      data: hopData,
+                      dataLabels: {
+                        enabled: false
+                      }
+                    },
+                    {
+                      type: 'mapline',
+                      id: 'route-series',
+                      data: [],
+                      lineWidth: 1.5,
+                      color: '#facc15',
+                      dashStyle: 'ShortDash',
+                      enableMouseTracking: false
+                    },
+                    {
+                      type: 'mappoint',
+                      id: 'orb-series',
+                      name: 'Orb',
+                      data:
+                        defaultHop
+                          ? [
+                              {
+                                id: 'orb-point',
+                                name: 'Orb',
+                                lat: defaultHop.lat,
+                                lon: defaultHop.lng
+                              }
+                            ]
+                          : [],
+                      marker: {
+                        radius: 10,
+                        symbol: 'circle',
+                        lineWidth: 0,
+                        fillColor: {
+                          radialGradient: { cx: 0.5, cy: 0.5, r: 0.7 },
+                          stops: [
+                            [0, 'rgba(254, 252, 232, 1)'],
+                            [0.4, 'rgba(250, 204, 21, 0.9)'],
+                            [0.8, 'rgba(251, 191, 36, 0.45)'],
+                            [1, 'rgba(234, 179, 8, 0)']
+                          ]
+                        }
+                      },
+                      states: { hover: { enabled: false } },
+                      enableMouseTracking: false
+                    }
+                  ]
+                });
+
+                return mapState.chart;
+              })
+              .catch((error) => {
+                console.error('Failed to initialise Highcharts map', error);
+                mapState.readyPromise = null;
+                return null;
+              });
+          }
+
+          return mapState.readyPromise;
+        }
+
+        function buildHopSeriesData(visitedHops) {
+          return Object.entries(HOP_COORDINATES).map(([key, detail]) => {
+            const active = visitedHops.has(key);
+            const baseColor = active ? '#f97316' : '#94a3b8';
+            return {
+              id: key,
+              name: `${detail.label} · ${key}`,
+              lat: detail.lat,
+              lon: detail.lng,
+              color: baseColor,
+              marker: {
+                radius: active ? 6 : 4,
+                symbol: 'circle',
+                fillColor: baseColor,
+                lineWidth: 1,
+                lineColor: 'rgba(15, 23, 42, 0.9)'
+              }
+            };
           });
+        }
+
+        function syncMapWithPoints(points) {
+          void initMap().then((chart) => {
+            if (!chart) return;
+            updateHopSeries(chart, points);
+            updateRouteSeries(chart, points);
+            chart.redraw();
+          });
+        }
+
+        function updateHopSeries(chart, points) {
+          const hopSeries = chart.get('hop-series');
+          if (!hopSeries) return;
+          const visited = new Set(points.map((point) => point.hop));
+          hopSeries.setData(buildHopSeriesData(visited), false);
+        }
+
+        function updateRouteSeries(chart, points) {
+          const routeSeries = chart.get('route-series');
+          if (!routeSeries) return;
+          routeSeries.setData(buildRouteGeometry(points), false);
+        }
+
+        function buildRouteGeometry(points) {
+          const data = [];
+          for (let i = 1; i < points.length; i += 1) {
+            const from = points[i - 1];
+            const to = points[i];
+            if (!from || !to) continue;
+            if (!Number.isFinite(from.lat) || !Number.isFinite(from.lng)) continue;
+            if (!Number.isFinite(to.lat) || !Number.isFinite(to.lng)) continue;
+            data.push({
+              id: `route-${i}`,
+              geometry: {
+                type: 'LineString',
+                coordinates: buildGreatCircleCoordinates(from, to)
+              }
+            });
+          }
+          return data;
+        }
+
+        function buildGreatCircleCoordinates(from, to, steps = 48) {
+          const coordinates = [];
+          for (let i = 0; i <= steps; i += 1) {
+            const t = i / steps;
+            const position = interpolateGreatCircle(from, to, t);
+            coordinates.push([position.lon, position.lat]);
+          }
+          return coordinates;
         }
 
         function normalizeHopLogEntry(entry) {
@@ -1400,11 +1562,6 @@
         }
 
         function updateMapWithHopLog(entries) {
-          const map = initMap();
-          if (!map) {
-            return [];
-          }
-
           const normalized = [];
           if (Array.isArray(entries)) {
             entries.forEach((entry) => {
@@ -1414,78 +1571,100 @@
               }
             });
           }
-
-          const latLngs = normalized.map((point) => [point.lat, point.lng]);
-
-          if (latLngs.length > 0) {
-            if (!mapState.routeLine) {
-              mapState.routeLine = L.polyline(latLngs, {
-                color: '#38bdf8',
-                weight: 3,
-                opacity: 0.7,
-                dashArray: '10 8'
-              }).addTo(map);
-            } else {
-              mapState.routeLine.setLatLngs(latLngs);
-            }
-
-            if (!mapState.hasFitBounds && latLngs.length >= 2) {
-              map.fitBounds(L.latLngBounds(latLngs).pad(0.3));
-              mapState.hasFitBounds = true;
-            }
-          } else if (mapState.routeLine) {
-            mapState.routeLine.setLatLngs([]);
-          }
-
-          mapState.markers.forEach((marker) => {
-            marker.setStyle({
-              color: '#94a3b8',
-              fillColor: '#94a3b8',
-              fillOpacity: 0.3
-            });
-          });
-
-          normalized.forEach((point) => {
-            const marker = mapState.markers.get(point.hop);
-            if (marker) {
-              marker.setStyle({
-                color: '#f97316',
-                fillColor: '#f97316',
-                fillOpacity: 0.85
-              });
-            }
-          });
-
+          syncMapWithPoints(normalized);
           return normalized;
         }
 
-        function ensureOrbMarker(point) {
-          const map = initMap();
-          if (!map || !point) {
-            return null;
+        function toRad(deg) {
+          return (deg * Math.PI) / 180;
+        }
+
+        function toDeg(rad) {
+          return (rad * 180) / Math.PI;
+        }
+
+        function interpolateGreatCircle(from, to, t) {
+          const lonFrom = typeof from.lon === 'number' ? from.lon : from.lng;
+          const lonTo = typeof to.lon === 'number' ? to.lon : to.lng;
+          const lat1 = toRad(from.lat);
+          const lon1 = toRad(lonFrom);
+          const lat2 = toRad(to.lat);
+          const lon2 = toRad(lonTo);
+
+          const x1 = Math.cos(lat1) * Math.cos(lon1);
+          const y1 = Math.cos(lat1) * Math.sin(lon1);
+          const z1 = Math.sin(lat1);
+
+          const x2 = Math.cos(lat2) * Math.cos(lon2);
+          const y2 = Math.cos(lat2) * Math.sin(lon2);
+          const z2 = Math.sin(lat2);
+
+          let dot = x1 * x2 + y1 * y2 + z1 * z2;
+          dot = Math.min(1, Math.max(-1, dot));
+          const omega = Math.acos(dot);
+
+          if (omega < 1e-6) {
+            return { lat: from.lat, lon: lonFrom };
           }
 
-          if (!mapState.orbMarker) {
-            const orbIcon = L.divIcon({ className: 'map-orb', iconSize: [18, 18] });
-            mapState.orbMarker = L.marker([point.lat, point.lng], {
-              icon: orbIcon,
-              interactive: false
-            }).addTo(map);
-          } else {
-            mapState.orbMarker.setLatLng([point.lat, point.lng]);
-            if (!map.hasLayer(mapState.orbMarker)) {
-              mapState.orbMarker.addTo(map);
-            }
-          }
+          const sinOmega = Math.sin(omega);
+          const t1 = Math.sin((1 - t) * omega) / sinOmega;
+          const t2 = Math.sin(t * omega) / sinOmega;
 
-          mapState.orbMarker.setOpacity(1);
-          return mapState.orbMarker;
+          const x = t1 * x1 + t2 * x2;
+          const y = t1 * y1 + t2 * y2;
+          const z = t1 * z1 + t2 * z2;
+
+          const lat = Math.atan2(z, Math.sqrt(x * x + y * y));
+          let lon = Math.atan2(y, x);
+
+          let latDeg = toDeg(lat);
+          let lonDeg = toDeg(lon);
+
+          if (lonDeg < -180) lonDeg += 360;
+          if (lonDeg > 180) lonDeg -= 360;
+
+          return { lat: latDeg, lon: lonDeg };
+        }
+
+        function getOrbPoint(chart, fallbackPoint) {
+          if (!chart) return null;
+          let orbPoint = chart.get('orb-point');
+          if (orbPoint) {
+            return orbPoint;
+          }
+          const orbSeries = chart.get('orb-series');
+          if (!orbSeries) return null;
+          const start = fallbackPoint || HOP_COORDINATES['muttr-us-east'];
+          if (!start) return null;
+          orbSeries.setData(
+            [
+              {
+                id: 'orb-point',
+                name: 'Orb',
+                lat: start.lat,
+                lon: start.lng
+              }
+            ],
+            false
+          );
+          chart.redraw();
+          return chart.get('orb-point');
         }
 
         function hideOrbMarker() {
-          if (mapState.orbMarker) {
-            mapState.orbMarker.setOpacity(0);
+          mapState.animationToken += 1;
+          if (mapState.animationFrame) {
+            cancelAnimationFrame(mapState.animationFrame);
+            mapState.animationFrame = null;
           }
+          void initMap().then((chart) => {
+            if (!chart) return;
+            const orbSeries = chart.get('orb-series');
+            if (orbSeries) {
+              orbSeries.setData([], true);
+            }
+          });
         }
 
         function startOrbAnimation(routePoints) {
@@ -1493,79 +1672,89 @@
             cancelAnimationFrame(mapState.animationFrame);
             mapState.animationFrame = null;
           }
-
-          const map = initMap();
-          if (!map || !Array.isArray(routePoints) || routePoints.length === 0) {
+          if (!Array.isArray(routePoints) || routePoints.length === 0) {
             hideOrbMarker();
             return;
           }
 
-          if (routePoints.length === 1) {
-            ensureOrbMarker(routePoints[0]);
-            return;
-          }
-
-          const timeline = routePoints.filter((point) => Number.isFinite(point.timestamp));
+          const timeline = routePoints
+            .filter((point) => Number.isFinite(point.timestamp))
+            .sort((a, b) => a.timestamp - b.timestamp);
 
           if (timeline.length < 2) {
-            ensureOrbMarker(routePoints[routePoints.length - 1]);
+            const finalPoint = timeline[0] || routePoints[routePoints.length - 1] || null;
+            if (finalPoint) {
+              void initMap().then((chart) => {
+                if (!chart) return;
+                const orbPoint = getOrbPoint(chart, finalPoint);
+                if (orbPoint) {
+                  orbPoint.update({ lat: finalPoint.lat, lon: finalPoint.lng }, true, false);
+                }
+              });
+            } else {
+              hideOrbMarker();
+            }
             return;
           }
 
           const segments = [];
-          let cumulative = 0;
+          let totalDuration = 0;
           for (let i = 1; i < timeline.length; i += 1) {
             const prev = timeline[i - 1];
             const current = timeline[i];
             const duration = Math.max(current.timestamp - prev.timestamp, 1);
             segments.push({
-              from: prev,
-              to: current,
-              start: cumulative,
+              from: { lat: prev.lat, lon: prev.lng },
+              to: { lat: current.lat, lon: current.lng },
+              start: totalDuration,
               duration,
-              end: cumulative + duration
+              end: totalDuration + duration
             });
-            cumulative += duration;
+            totalDuration += duration;
           }
 
           if (segments.length === 0) {
-            ensureOrbMarker(timeline[timeline.length - 1]);
             return;
           }
 
-          const orb = ensureOrbMarker(timeline[0]);
-          if (!orb) return;
+          const animationToken = (mapState.animationToken += 1);
 
-          const totalDuration = segments[segments.length - 1].end;
-          const animationStart = performance.now();
-
-          function step() {
-            const elapsed = performance.now() - animationStart;
-            if (elapsed >= totalDuration) {
-              const lastPoint = segments[segments.length - 1].to;
-              orb.setLatLng([lastPoint.lat, lastPoint.lng]);
-              mapState.animationFrame = null;
+          void initMap().then((chart) => {
+            if (!chart || mapState.animationToken !== animationToken) {
               return;
             }
 
-            const currentTime = elapsed;
-            let active = segments[0];
-            for (let i = 0; i < segments.length; i += 1) {
-              if (currentTime <= segments[i].end) {
-                active = segments[i];
-                break;
-              }
+            const orbPoint = getOrbPoint(chart, timeline[0]);
+            if (!orbPoint) {
+              return;
             }
 
-            const progress = active.duration <= 0 ? 1 : (currentTime - active.start) / active.duration;
-            const clamped = Math.max(0, Math.min(1, progress));
-            const lat = active.from.lat + (active.to.lat - active.from.lat) * clamped;
-            const lng = active.from.lng + (active.to.lng - active.from.lng) * clamped;
-            orb.setLatLng([lat, lng]);
-            mapState.animationFrame = requestAnimationFrame(step);
-          }
+            orbPoint.update({ lat: timeline[0].lat, lon: timeline[0].lng }, true, false);
+            const animationStart = performance.now();
 
-          mapState.animationFrame = requestAnimationFrame(step);
+            const step = (timestamp) => {
+              if (mapState.animationToken !== animationToken) {
+                return;
+              }
+
+              const elapsed = timestamp - animationStart;
+              if (elapsed >= totalDuration) {
+                const finalSegment = segments[segments.length - 1];
+                orbPoint.update({ lat: finalSegment.to.lat, lon: finalSegment.to.lon }, true, false);
+                mapState.animationFrame = null;
+                return;
+              }
+
+              const current = segments.find((segment) => elapsed <= segment.end) || segments[segments.length - 1];
+              const localTime = Math.max(0, Math.min(current.duration, elapsed - current.start));
+              const progress = current.duration === 0 ? 1 : localTime / current.duration;
+              const position = interpolateGreatCircle(current.from, current.to, progress);
+              orbPoint.update({ lat: position.lat, lon: position.lon }, true, false);
+              mapState.animationFrame = requestAnimationFrame(step);
+            };
+
+            mapState.animationFrame = requestAnimationFrame(step);
+          });
         }
 
         let running = false;

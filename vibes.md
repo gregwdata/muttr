@@ -63,6 +63,8 @@ Legacy Cloudflare Worker prototype retained for historical reference. No longer 
 
 ## 🛠 Implementation Log
 
+- **2025-03-05** – Swapped the relay UI's Leaflet globe for a Highcharts-powered map with real-time great-circle orb animation keyed to hop timings so each lap replays with the actual per-leg durations.
+
 - **2025-03-04** – Embedded the original relay UI at the bottom of `docs/index.html`, wired the “Launch the Relay” CTAs to scroll straight to it, and restored the Leaflet-powered map plus hop loop so the marketing page still delivers the working app.
 - **2025-03-02** – Added a technology showcase to `docs/index.html` that explains the global hop choreography (now with “so agentic, much wow” energy) and forced the hero modal to reappear on every visit for maximum theatrical pacing.
 - **2025-03-03** – Restored the long-form, SaaS-grade marketing scroll in `docs/index.html`, softened the technology copy into vibe-rich, globe-trotting language (still featuring “so agentic, much wow”), and kept the modal firing on every visit.
