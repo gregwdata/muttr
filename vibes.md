@@ -63,6 +63,9 @@ Legacy Cloudflare Worker prototype retained for historical reference. No longer 
 
 ## 🛠 Implementation Log
 
+- **2025-03-02** – Added a technology showcase to `docs/index.html` that explains the global hop choreography (now with “so agentic, much wow” energy) and forced the hero modal to reappear on every visit for maximum theatrical pacing.
+- **2025-03-03** – Restored the long-form, SaaS-grade marketing scroll in `docs/index.html`, softened the technology copy into vibe-rich, globe-trotting language (still featuring “so agentic, much wow”), and kept the modal firing on every visit.
+- **2025-03-01** – Rebuilt `docs/index.html` into a marketing-forward landing page with a launch modal, blurred background treatment, long-form feature storytelling, and call-to-action flows for the muttr relay.
 - **2025-02-28** – Removed the hop-level artificial delay so telemetry reflects true network latency, and upgraded the UI with a Leaflet-powered world map plus real-time orb animation that replays each completed lap.
 - **2025-02-27** – Moved the system prompt definition out of the UI and into the Azure Function, refreshed the default concerns, and rebuilt the web client inputs to queue list updates with suggestion buttons.
 - **2025-02-26** – Gated the Azure Functions deployment workflow behind path filters and pushed full OpenRouter prompt control into the UI with a dev-only system prompt editor plus a "modify the burden" injector.
