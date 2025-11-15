@@ -63,6 +63,7 @@ Legacy Cloudflare Worker prototype retained for historical reference. No longer 
 
 ## 🛠 Implementation Log
 
+- **2025-02-20** – Moved the public UI to Cloudflare Pages with a dedicated GitHub Actions deployer, wired up the custom domain (muttr.materialmachinelearn.ing), and taught the static client to default to the public hop when served from that host.
 - **2025-02-19** – Added universal CORS headers and explicit OPTIONS handling to the Azure Function hop so the GitHub Pages UI can call it without preflight failures.
 - **2025-02-18** – Locked every Azure CLI call to the target subscription, serialized the deployment matrix so the US East hop provisions shared resources first, and updated the README to call out the sequencing behaviour.
 - **2025-02-18** – Stabilized the Azure deployment workflow: pinned the resource group/storage account location, explicitly selected the subscription after login, and documented the new env vars in the README so multi-region deploys succeed.

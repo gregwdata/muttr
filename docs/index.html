@@ -249,13 +249,33 @@
       const endpointNotice = document.querySelector('#endpoint-notice');
       const errorEl = document.querySelector('#error');
 
-      const runningOnGitHubPages = window.location.hostname.endsWith('github.io');
-      const defaultEndpoint = runningOnGitHubPages ? '' : '/api/muttr';
+      const hostname = window.location.hostname;
+      const runningOnGitHubPages = hostname.endsWith('github.io');
+      const runningOnCloudflarePages = hostname.endsWith('.pages.dev');
+      const runningOnMuttrDomain = hostname === 'muttr.materialmachinelearn.ing';
+
+      let defaultEndpoint = '';
+      if (runningOnMuttrDomain) {
+        defaultEndpoint = 'https://muttr-us-east.azurewebsites.net/api/muttr';
+      } else if (!runningOnGitHubPages && !runningOnCloudflarePages && hostname) {
+        defaultEndpoint = '/api/muttr';
+      }
+
       if (defaultEndpoint) {
         endpointInput.value = defaultEndpoint;
-        endpointNotice.textContent = 'Defaulting to relative /api/muttr for self-hosted deployments.';
+        if (runningOnMuttrDomain) {
+          endpointNotice.textContent = 'Defaulting to the public muttr US East hop. Override if you operate your own relay.';
+        } else {
+          endpointNotice.textContent = 'Defaulting to relative /api/muttr for self-hosted deployments.';
+        }
       } else {
-        endpointNotice.textContent = 'Add the URL to your first Azure Function hop (e.g. https://muttr-us-east.azurewebsites.net/api/muttr).';
+        let message = 'Add the URL to your first Azure Function hop (e.g. https://muttr-us-east.azurewebsites.net/api/muttr).';
+        if (runningOnGitHubPages) {
+          message += ' GitHub Pages cannot set custom CORS headers; consider using https://muttr.materialmachinelearn.ing instead.';
+        } else if (runningOnCloudflarePages) {
+          message += ' This Cloudflare Pages build leaves the field blank so you can target a private relay.';
+        }
+        endpointNotice.textContent = message;
       }
 
       let running = false;
@@ -312,7 +332,7 @@
             method: 'POST',
             headers: {
               'content-type': 'text/plain; charset=utf-8',
-              'X-Muttr-Direction': 'forward',
+              'X-Direction': 'forward',
             },
             body: payload,
             signal: controller.signal,
