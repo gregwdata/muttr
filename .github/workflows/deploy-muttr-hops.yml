@@ -152,12 +152,27 @@ jobs:
       - name: Configure CORS
         run: |
           APP_NAME="${{ matrix.hop.name }}"
+          REQUIRED_ORIGINS=(
+            "https://gregwdata.github.io"
+            "https://muttr.materialmachinelearn.ing"
+          )
 
-          az functionapp cors set \
+          EXISTING_ORIGINS=$(az functionapp cors show \
             --subscription "$AZURE_SUBSCRIPTION_ID" \
             --resource-group "$AZURE_RESOURCE_GROUP" \
             --name "$APP_NAME" \
-            --allowed-origins https://gregwdata.github.io https://muttr.materialmachinelearn.ing
+            --query "allowedOrigins" \
+            -o tsv || true)
+
+          for ORIGIN in "${REQUIRED_ORIGINS[@]}"; do
+            if ! printf '%s\n' "$EXISTING_ORIGINS" | grep -Fxq "$ORIGIN"; then
+              az functionapp cors add \
+                --subscription "$AZURE_SUBSCRIPTION_ID" \
+                --resource-group "$AZURE_RESOURCE_GROUP" \
+                --name "$APP_NAME" \
+                --allowed-origins "$ORIGIN"
+            fi
+          done
 
       - name: Deploy to Azure Functions
         uses: Azure/functions-action@v1

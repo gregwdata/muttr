@@ -63,6 +63,8 @@ Legacy Cloudflare Worker prototype retained for historical reference. No longer 
 
 ## 🛠 Implementation Log
 
+- **2025-02-22** – Updated the deployment workflow to check existing Function App CORS origins before adding the GitHub Pages and Cloudflare hosts so repeated runs stay idempotent.
+- **2025-02-22** – Fixed the Cloudflare Pages deployment to verify the custom domain on the correct project before creating it, keeping the step idempotent and aligned with the live site.
 - **2025-02-21** – Locked the browser UI to the public US East entry hop, hid the endpoint selector, and taught the Azure deployment workflow to set CORS for the GitHub Pages and Cloudflare origins.
 - **2025-02-20** – Moved the public UI to Cloudflare Pages with a dedicated GitHub Actions deployer, wired up the custom domain (muttr.materialmachinelearn.ing), and taught the static client to default to the public hop when served from that host.
 - **2025-02-19** – Added universal CORS headers and explicit OPTIONS handling to the Azure Function hop so the GitHub Pages UI can call it without preflight failures.

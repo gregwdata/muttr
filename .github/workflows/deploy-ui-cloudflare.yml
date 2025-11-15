@@ -39,7 +39,7 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_PAGES_PROJECT: muttr-ui
+          CLOUDFLARE_PAGES_PROJECT: muttr
           CUSTOM_DOMAIN: muttr.materialmachinelearn.ing
         run: |
           set -euo pipefail
@@ -47,23 +47,26 @@ jobs:
           AUTH_HEADER="Authorization: Bearer ${CLOUDFLARE_API_TOKEN}"
           BODY="{\"name\":\"${CUSTOM_DOMAIN}\"}"
 
-          put_status=$(curl -sS -o response.json -w "%{http_code}" \
-            -X PUT "${API_BASE}/${CUSTOM_DOMAIN}" \
+          get_status=$(curl -sS -o response.json -w "%{http_code}" \
+            -X GET "${API_BASE}/${CUSTOM_DOMAIN}" \
+            -H "${AUTH_HEADER}" \
+            -H "Content-Type: application/json")
+
+          if [[ "${get_status}" == "200" ]]; then
+            cat response.json
+            exit 0
+          elif [[ "${get_status}" != "404" ]]; then
+            cat response.json >&2
+            exit 1
+          fi
+
+          post_status=$(curl -sS -o response.json -w "%{http_code}" \
+            -X POST "${API_BASE}" \
             -H "${AUTH_HEADER}" \
             -H "Content-Type: application/json" \
             --data "${BODY}")
 
-          if [[ "${put_status}" == "404" ]]; then
-            post_status=$(curl -sS -o response.json -w "%{http_code}" \
-              -X POST "${API_BASE}" \
-              -H "${AUTH_HEADER}" \
-              -H "Content-Type: application/json" \
-              --data "${BODY}")
-            if [[ "${post_status}" -ge 400 ]]; then
-              cat response.json >&2
-              exit 1
-            fi
-          elif [[ "${put_status}" -ge 400 ]]; then
+          if [[ "${post_status}" -ge 400 ]]; then
             cat response.json >&2
             exit 1
           fi
