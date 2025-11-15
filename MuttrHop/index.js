@@ -1,3 +1,5 @@
+const os = require("os");
+
 module.exports = async function (context, req) {
   const HOP_NAME = process.env.HOP_NAME || "unknown-hop";
   const NEXT_HOP_URL = process.env.NEXT_HOP_URL || null;
@@ -92,6 +94,57 @@ module.exports = async function (context, req) {
     await new Promise((resolve) => setTimeout(resolve, DELAY_MS));
   }
 
+  function safeParseUrl(value) {
+    if (!value) {
+      return null;
+    }
+
+    try {
+      return new URL(value);
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function deriveSelfHostname() {
+    const originUrl = safeParseUrl(origin);
+
+    const candidates = [
+      process.env.MUTTR_HOSTNAME,
+      process.env.WEBSITE_HOSTNAME,
+      req.headers["x-appservice-hostname"],
+      req.headers.host,
+      originUrl ? originUrl.host : null
+    ]
+      .map((value) => (value ? String(value).trim() : ""))
+      .filter((value) => value.length > 0);
+
+    if (candidates.length > 0) {
+      return candidates[0];
+    }
+
+    return os.hostname();
+  }
+
+  function deriveSelfProtocol() {
+    let forwardedProtoHeader = req.headers["x-forwarded-proto"];
+    if (Array.isArray(forwardedProtoHeader)) {
+      forwardedProtoHeader = forwardedProtoHeader[0];
+    }
+
+    const forwardedProto = forwardedProtoHeader
+      ? String(forwardedProtoHeader).split(",")[0].trim()
+      : null;
+
+    const originUrl = safeParseUrl(origin);
+    const originProtocol = originUrl && originUrl.protocol
+      ? originUrl.protocol.replace(/:$/, "")
+      : null;
+
+    const protocol = forwardedProto || originProtocol || "https";
+    return protocol.replace(/:$/, "");
+  }
+
   async function callHop(targetUrl, newDirection, bodyStr) {
     const headers = {
       "Content-Type": "text/plain",
@@ -169,6 +222,12 @@ module.exports = async function (context, req) {
       ]
     };
 
+    const refererHost = deriveSelfHostname();
+    const refererProtocol = deriveSelfProtocol();
+    const refererHeaderValue = refererHost.includes("://")
+      ? refererHost
+      : `${refererProtocol}://${refererHost}`;
+
     let orResp;
     try {
       orResp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -176,7 +235,7 @@ module.exports = async function (context, req) {
         headers: {
           Authorization: `Bearer ${OPENROUTER_API_KEY}`,
           "Content-Type": "application/json",
-          "HTTP-Referer": "https://yourdomain.example",
+          "HTTP-Referer": refererHeaderValue,
           "X-Title": "muttr"
         },
         body: JSON.stringify(openRouterReqBody)
