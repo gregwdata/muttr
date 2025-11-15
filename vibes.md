@@ -63,6 +63,7 @@ Legacy Cloudflare Worker prototype retained for historical reference. No longer 
 
 ## 🛠 Implementation Log
 
+- **2025-02-18** – Locked every Azure CLI call to the target subscription, serialized the deployment matrix so the US East hop provisions shared resources first, and updated the README to call out the sequencing behaviour.
 - **2025-02-18** – Stabilized the Azure deployment workflow: pinned the resource group/storage account location, explicitly selected the subscription after login, and documented the new env vars in the README so multi-region deploys succeed.
 - **2025-02-17** – Rebuilt the relay on Azure Functions: added `MuttrHop/`, `host.json`, replaced the Cloudflare deployment workflow with `deploy-muttr-hops.yml`, refreshed the README, and tuned the UI copy for the new endpoints.
 - **2025-02-16** – Replaced a template literal in `src/worker.mjs` with string concatenation so Wrangler’s esbuild stopped tripping over "Hop failed" during deploy.

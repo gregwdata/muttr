@@ -72,6 +72,7 @@ The Cloudflare Worker script is still present for posterity but no longer powers
    - Edit `.github/workflows/deploy-muttr-hops.yml` if you need different app names, regions, delays, or OpenRouter model.
    - `AZURE_RESOURCE_GROUP_LOCATION` pins the resource group + storage account location (resources can still live in any region).
    - `AZURE_SUBSCRIPTION_ID` is populated automatically from the service principal JSON so we can explicitly select the subscription before provisioning.
+   - The workflow runs the matrix sequentially (`max-parallel: 1`) so the US East hop provisions shared resources before later regions deploy.
    - The matrix defines the full hop chain. Update `nextUrl` / `prevUrl` values if you rename Function Apps or use custom domains.
 
 4. **Trigger a deployment**
