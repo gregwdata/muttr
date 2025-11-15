@@ -72,7 +72,8 @@ The Cloudflare Worker script is still present for posterity but no longer powers
       If it returns e.g. “NotRegistered” then you need to register:
          
          az provider register --namespace Microsoft.Storage
-      Then wait for registration to complete (may take a few minutes). 
+      Then wait for registration to complete (may take a few minutes).
+   - Repeat the above step for `Microsoft.Web`
 
 2. **Store your OpenRouter key**
    - Add `OPENROUTER_API_KEY` as a GitHub secret.
