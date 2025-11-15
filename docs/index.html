@@ -65,6 +65,14 @@
         font-family: "Iosevka", "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
       }
 
+      textarea.compact {
+        min-height: 120px;
+      }
+
+      textarea.system-input {
+        min-height: 180px;
+      }
+
       button {
         appearance: none;
         border: none;
@@ -84,6 +92,18 @@
         box-shadow: 0 20px 40px rgba(236, 72, 153, 0.45);
       }
 
+      button.secondary-button {
+        background: rgba(15, 23, 42, 0.55);
+        color: #f97316;
+        border: 1px solid rgba(249, 115, 22, 0.4);
+        box-shadow: none;
+        padding: 0.6rem 1.1rem;
+      }
+
+      button.secondary-button:hover:not([disabled]) {
+        box-shadow: 0 12px 22px rgba(249, 115, 22, 0.25);
+      }
+
       button[disabled] {
         cursor: progress;
         opacity: 0.65;
@@ -95,6 +115,12 @@
         gap: 0.75rem;
         flex-wrap: wrap;
         align-items: center;
+      }
+
+      .stack {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
       }
 
       .badge {
@@ -111,6 +137,18 @@
       .notice {
         font-size: 0.8rem;
         opacity: 0.75;
+        margin: 0;
+      }
+
+      label {
+        font-size: 0.85rem;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+      }
+
+      .dev-note {
+        font-size: 0.75rem;
+        opacity: 0.65;
         margin: 0;
       }
 
@@ -171,6 +209,31 @@
         <textarea id="seed" placeholder="Plant your initial todo vibe here...">- plan launch party
 - check rocket fuel levels
 - convince the parrot we're serious explorers</textarea>
+        <label for="burden">Modify the burden</label>
+        <textarea
+          id="burden"
+          class="compact"
+          placeholder="Optional: add a fresh constraint or twist for the next hop"
+        ></textarea>
+        <p class="dev-note">
+          When populated, the modifier is sent as a second user message on the next loop.
+        </p>
+        <div class="controls">
+          <button id="toggle-system" type="button" class="secondary-button">
+            Show system prompt editor
+          </button>
+        </div>
+        <div id="system-editor" class="stack" hidden>
+          <label for="system-prompt">System prompt</label>
+          <textarea
+            id="system-prompt"
+            class="system-input"
+            placeholder="Define how the relay should behave"
+          >You are a chaotic todo-list game of telephone. Repeat and mutate this list as you see fit.</textarea>
+          <p class="dev-note">
+            ⚠️ Dev-only feature: edits live solely in this browser session and ship straight to OpenRouter.
+          </p>
+        </div>
         <p class="notice">
           The loop always launches through the public muttr entry hop. Bring your own client if you need a private circuit.
         </p>
@@ -207,6 +270,10 @@
 
     <script>
       const seed = document.querySelector('#seed');
+      const burden = document.querySelector('#burden');
+      const systemEditor = document.querySelector('#system-editor');
+      const systemPromptInput = document.querySelector('#system-prompt');
+      const toggleSystemBtn = document.querySelector('#toggle-system');
       const startBtn = document.querySelector('#start');
       const stopBtn = document.querySelector('#stop');
       const iterationsEl = document.querySelector('#iterations');
@@ -217,9 +284,17 @@
       const rawEl = document.querySelector('#raw');
       const errorEl = document.querySelector('#error');
 
+      const DEFAULT_SYSTEM_PROMPT =
+        'You are a chaotic todo-list game of telephone. Repeat and mutate this list as you see fit.';
+
+      if (!systemPromptInput.value.trim()) {
+        systemPromptInput.value = DEFAULT_SYSTEM_PROMPT;
+      }
+
       let running = false;
       let iteration = 0;
-      let currentPayload = '';
+      let initialSeed = '';
+      let lastAssistantText = '';
       const FIRST_HOP_URL = 'https://muttr-us-east.azurewebsites.net/api/muttr';
       let currentEndpoint = FIRST_HOP_URL;
 
@@ -241,8 +316,9 @@
         if (!result) return;
         assistantEl.textContent = result.assistant_text || '(no assistant text)';
         chainEl.textContent = result.hop_chain || '(no chain)';
-        iterationsEl.textContent = iteration;
-        rawEl.textContent = JSON.stringify(result.openrouter_response, null, 2);
+        rawEl.textContent = result.openrouter_response
+          ? JSON.stringify(result.openrouter_response, null, 2)
+          : '(no raw payload)';
 
         logEl.innerHTML = '';
         (result.hop_log || []).forEach((entry) => {
@@ -253,6 +329,33 @@
         });
       }
 
+      function buildRequestPayload() {
+        const systemPrompt = systemPromptInput.value.trim() || DEFAULT_SYSTEM_PROMPT;
+        const modifier = burden.value.trim();
+        const primaryUserMessage =
+          iteration === 0
+            ? initialSeed
+            : lastAssistantText || '(previous assistant output unavailable)';
+
+        const messages = [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: primaryUserMessage }
+        ];
+
+        if (modifier) {
+          messages.push({ role: 'user', content: modifier });
+        }
+
+        return JSON.stringify({
+          version: 1,
+          messages,
+          metadata: {
+            origin: 'muttr-ui',
+            iteration
+          }
+        });
+      }
+
       async function runOnce(payload) {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 60000);
@@ -260,13 +363,13 @@
           const response = await fetch(currentEndpoint, {
             method: 'POST',
             headers: {
-              'content-type': 'text/plain; charset=utf-8',
-              'X-Direction': 'forward',
+              'content-type': 'application/json; charset=utf-8',
+              'X-Direction': 'forward'
             },
             body: payload,
             signal: controller.signal,
             mode: 'cors',
-            credentials: 'omit',
+            credentials: 'omit'
           });
 
           if (!response.ok) {
@@ -275,10 +378,7 @@
           }
 
           const result = await response.json();
-          iteration += 1;
-          updateUI(result);
-          showError('');
-          return result.assistant_text || '';
+          return result;
         } catch (error) {
           throw error;
         } finally {
@@ -290,7 +390,13 @@
         if (!running) return;
         setStatus('in-flight');
         try {
-          currentPayload = await runOnce(currentPayload);
+          const payload = buildRequestPayload();
+          const result = await runOnce(payload);
+          iteration += 1;
+          iterationsEl.textContent = iteration;
+          lastAssistantText = result && result.assistant_text ? result.assistant_text : '';
+          updateUI(result);
+          showError('');
           if (!running) return;
           setStatus('waiting');
           requestAnimationFrame(loop);
@@ -308,7 +414,9 @@
         if (running) return;
         running = true;
         iteration = 0;
-        currentPayload = seed.value.trim() || '(empty seed)';
+        initialSeed = seed.value.trim() || '(empty seed)';
+        lastAssistantText = '';
+        iterationsEl.textContent = '0';
         startBtn.disabled = true;
         stopBtn.disabled = false;
         showError('');
@@ -321,6 +429,17 @@
         startBtn.disabled = false;
         stopBtn.disabled = true;
         setStatus('stopped');
+      });
+
+      toggleSystemBtn.addEventListener('click', () => {
+        const isHidden = systemEditor.hasAttribute('hidden');
+        if (isHidden) {
+          systemEditor.hidden = false;
+          toggleSystemBtn.textContent = 'Hide system prompt editor';
+        } else {
+          systemEditor.hidden = true;
+          toggleSystemBtn.textContent = 'Show system prompt editor';
+        }
       });
     </script>
   </body>
