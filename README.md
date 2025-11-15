@@ -70,14 +70,16 @@ The Cloudflare Worker script is still present for posterity but no longer powers
 
 3. **(Optional) Adjust workflow defaults**
    - Edit `.github/workflows/deploy-muttr-hops.yml` if you need different app names, regions, delays, or OpenRouter model.
+   - `AZURE_RESOURCE_GROUP_LOCATION` pins the resource group + storage account location (resources can still live in any region).
+   - `AZURE_SUBSCRIPTION_ID` is populated automatically from the service principal JSON so we can explicitly select the subscription before provisioning.
    - The matrix defines the full hop chain. Update `nextUrl` / `prevUrl` values if you rename Function Apps or use custom domains.
 
 4. **Trigger a deployment**
    - Push to `main` or run the workflow manually from the GitHub Actions tab.
    - The job performs:
      - Azure login via the service principal.
-     - Resource group creation (idempotent per region).
-     - Storage account creation (only on the first matrix iteration).
+     - Resource group creation (idempotent, uses `AZURE_RESOURCE_GROUP_LOCATION`).
+     - Storage account creation (only on the first matrix iteration, also in `AZURE_RESOURCE_GROUP_LOCATION`).
      - Function App creation if missing.
      - App settings updates for hop wiring + OpenRouter credentials on the final hop.
      - Code deployment for each Function App via `Azure/functions-action@v1`.

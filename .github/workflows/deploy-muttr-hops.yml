@@ -7,9 +7,11 @@ on:
 
 env:
   AZURE_RESOURCE_GROUP: muttr-rg
+  AZURE_RESOURCE_GROUP_LOCATION: eastus
   AZURE_STORAGE_ACCOUNT: muttrfuncstorage123
   AZURE_FUNCTIONAPP_PACKAGE_PATH: '.'
   NODE_VERSION: '20.x'
+  AZURE_SUBSCRIPTION_ID: ${{ fromJson(secrets.AZURE_CREDENTIALS).subscriptionId }}
 
 jobs:
   deploy:
@@ -72,11 +74,14 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      - name: Select subscription
+        run: az account set --subscription "$AZURE_SUBSCRIPTION_ID"
+
       - name: Ensure resource group exists
         run: |
           az group create \
             --name "$AZURE_RESOURCE_GROUP" \
-            --location "${{ matrix.hop.region }}"
+            --location "$AZURE_RESOURCE_GROUP_LOCATION"
 
       - name: Ensure storage account exists
         if: matrix.hop.name == 'muttr-us-east'
@@ -85,7 +90,7 @@ jobs:
             az storage account create \
               -n "$AZURE_STORAGE_ACCOUNT" \
               -g "$AZURE_RESOURCE_GROUP" \
-              -l "${{ matrix.hop.region }}" \
+              -l "$AZURE_RESOURCE_GROUP_LOCATION" \
               --sku Standard_LRS \
               --kind StorageV2
           fi
