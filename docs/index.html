@@ -108,27 +108,6 @@
         background: rgba(15, 23, 42, 0.55);
       }
 
-      .endpoint-control {
-        display: flex;
-        flex-direction: column;
-        gap: 0.35rem;
-      }
-
-      .endpoint-control label {
-        font-size: 0.85rem;
-        font-weight: 500;
-      }
-
-      .endpoint-control input {
-        width: 100%;
-        padding: 0.6rem 0.75rem;
-        border-radius: 10px;
-        border: 1px solid rgba(148, 163, 184, 0.25);
-        background: rgba(15, 23, 42, 0.55);
-        color: inherit;
-        font-size: 0.85rem;
-      }
-
       .notice {
         font-size: 0.8rem;
         opacity: 0.75;
@@ -192,19 +171,10 @@
         <textarea id="seed" placeholder="Plant your initial todo vibe here...">- plan launch party
 - check rocket fuel levels
 - convince the parrot we're serious explorers</textarea>
-        <div class="endpoint-control">
-          <label for="endpoint">First hop endpoint</label>
-          <input
-            id="endpoint"
-            type="url"
-            inputmode="url"
-            placeholder="https://us-east.yourdomain.com/api/hop"
-            autocomplete="off"
-            spellcheck="false"
-          />
-          <p id="endpoint-notice" class="notice"></p>
-          <p id="error" class="error-message" hidden></p>
-        </div>
+        <p class="notice">
+          The loop always launches through the public muttr entry hop. Bring your own client if you need a private circuit.
+        </p>
+        <p id="error" class="error-message" hidden></p>
         <div class="controls">
           <button id="start">Start Global Loop</button>
           <button id="stop" disabled>Stop</button>
@@ -245,43 +215,13 @@
       const chainEl = document.querySelector('#chain');
       const logEl = document.querySelector('#log');
       const rawEl = document.querySelector('#raw');
-      const endpointInput = document.querySelector('#endpoint');
-      const endpointNotice = document.querySelector('#endpoint-notice');
       const errorEl = document.querySelector('#error');
-
-      const hostname = window.location.hostname;
-      const runningOnGitHubPages = hostname.endsWith('github.io');
-      const runningOnCloudflarePages = hostname.endsWith('.pages.dev');
-      const runningOnMuttrDomain = hostname === 'muttr.materialmachinelearn.ing';
-
-      let defaultEndpoint = '';
-      if (runningOnMuttrDomain) {
-        defaultEndpoint = 'https://muttr-us-east.azurewebsites.net/api/muttr';
-      } else if (!runningOnGitHubPages && !runningOnCloudflarePages && hostname) {
-        defaultEndpoint = '/api/muttr';
-      }
-
-      if (defaultEndpoint) {
-        endpointInput.value = defaultEndpoint;
-        if (runningOnMuttrDomain) {
-          endpointNotice.textContent = 'Defaulting to the public muttr US East hop. Override if you operate your own relay.';
-        } else {
-          endpointNotice.textContent = 'Defaulting to relative /api/muttr for self-hosted deployments.';
-        }
-      } else {
-        let message = 'Add the URL to your first Azure Function hop (e.g. https://muttr-us-east.azurewebsites.net/api/muttr).';
-        if (runningOnGitHubPages) {
-          message += ' GitHub Pages cannot set custom CORS headers; consider using https://muttr.materialmachinelearn.ing instead.';
-        } else if (runningOnCloudflarePages) {
-          message += ' This Cloudflare Pages build leaves the field blank so you can target a private relay.';
-        }
-        endpointNotice.textContent = message;
-      }
 
       let running = false;
       let iteration = 0;
       let currentPayload = '';
-      let currentEndpoint = defaultEndpoint || '';
+      const FIRST_HOP_URL = 'https://muttr-us-east.azurewebsites.net/api/muttr';
+      let currentEndpoint = FIRST_HOP_URL;
 
       function setStatus(text) {
         statusEl.textContent = text;
@@ -311,17 +251,6 @@
           li.textContent = JSON.stringify(entry, null, 2);
           logEl.appendChild(li);
         });
-      }
-
-      function resolveEndpoint() {
-        const value = endpointInput.value.trim();
-        if (!value) {
-          throw new Error('Please provide the first hop endpoint URL before starting the loop.');
-        }
-        if (value.startsWith('/') || value.startsWith('http://') || value.startsWith('https://')) {
-          return value;
-        }
-        throw new Error('Endpoint must start with / for relative calls or include http(s):// for absolute URLs.');
       }
 
       async function runOnce(payload) {
@@ -377,14 +306,6 @@
 
       startBtn.addEventListener('click', () => {
         if (running) return;
-        try {
-          currentEndpoint = resolveEndpoint();
-        } catch (error) {
-          showError(error.message);
-          setStatus('error');
-          return;
-        }
-
         running = true;
         iteration = 0;
         currentPayload = seed.value.trim() || '(empty seed)';
