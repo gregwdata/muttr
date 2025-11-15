@@ -17,57 +17,8 @@ muttr is a stateless, globe-trotting todo experiment that bounces every update a
    ```
    Review `src/worker.mjs` to understand the hop logic and ensure the HTML UI meets your needs.
 
-3. **Create `wrangler.toml`**
-   Use the unified worker entry point with per-environment variables. Save the following template as `wrangler.toml` and swap `YOURDOMAIN.COM` for your zone:
-   ```toml
-   name = "global-hop"
-   main = "src/worker.mjs"
-   compatibility_date = "2024-11-01"
-
-   [env.us_east]
-   vars = {
-     HOP_NAME = "us-east-hop",
-     NEXT_HOP_URL = "https://brazil.YOURDOMAIN.COM",
-     DELAY_MS = "100"
-   }
-   routes = ["us-east.YOURDOMAIN.COM/*"]
-
-   [env.brazil]
-   vars = {
-     HOP_NAME = "brazil-hop",
-     NEXT_HOP_URL = "https://uk.YOURDOMAIN.COM",
-     PREV_HOP_URL = "https://us-east.YOURDOMAIN.COM",
-     DELAY_MS = "150"
-   }
-   routes = ["brazil.YOURDOMAIN.COM/*"]
-
-   [env.uk]
-   vars = {
-     HOP_NAME = "uk-hop",
-     NEXT_HOP_URL = "https://singapore.YOURDOMAIN.COM",
-     PREV_HOP_URL = "https://brazil.YOURDOMAIN.COM",
-     DELAY_MS = "200"
-   }
-   routes = ["uk.YOURDOMAIN.COM/*"]
-
-   [env.singapore]
-   vars = {
-     HOP_NAME = "singapore-hop",
-     NEXT_HOP_URL = "https://sydney.YOURDOMAIN.COM",
-     PREV_HOP_URL = "https://uk.YOURDOMAIN.COM",
-     DELAY_MS = "300"
-   }
-   routes = ["singapore.YOURDOMAIN.COM/*"]
-
-   [env.sydney]
-   vars = {
-     HOP_NAME = "sydney-hop",
-     PREV_HOP_URL = "https://singapore.YOURDOMAIN.COM",
-     DELAY_MS = "400",
-     OPENROUTER_MODEL = "openai/gpt-4o-mini"
-   }
-   routes = ["sydney.YOURDOMAIN.COM/*"]
-   ```
+3. **Review `wrangler.toml`**
+   The repo now includes a ready-to-customize `wrangler.toml` that sets up each hop with the shared worker script. Open the file, swap `YOURDOMAIN.COM` for your zone, and adjust the `DELAY_MS` values or environment bindings as needed before deploying.
 
 4. **Configure secrets and optional CORS**
    - Run `npx wrangler secret put OPENROUTER_API_KEY --env sydney` and paste your key. The Sydney hop is responsible for calling OpenRouter.
