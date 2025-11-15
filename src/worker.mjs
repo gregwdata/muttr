@@ -293,6 +293,62 @@ const html = `<!DOCTYPE html>
 
 const OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
 
+function determineAllowedOrigin(request, env) {
+  const configured = (env && env.CORS_ALLOW_ORIGIN) || "*";
+  if (!configured || configured === "*") {
+    return "*";
+  }
+  if (configured === "request-origin") {
+    return request.headers.get("Origin") || "*";
+  }
+  return configured;
+}
+
+function withCors(response, request, env) {
+  if (!response) return response;
+  const headers = new Headers(response.headers);
+  const allowOrigin = determineAllowedOrigin(request, env);
+  headers.set("Access-Control-Allow-Origin", allowOrigin);
+  if (allowOrigin !== "*") {
+    headers.append("Vary", "Origin");
+  }
+  headers.set(
+    "Access-Control-Allow-Headers",
+    request.headers.get("Access-Control-Request-Headers") ||
+      "Content-Type, X-Muttr-Direction, X-Hop-Chain, X-Hop-Log",
+  );
+  headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
+function corsPreflight(request, env) {
+  const headers = new Headers();
+  const allowOrigin = determineAllowedOrigin(request, env);
+  headers.set("Access-Control-Allow-Origin", allowOrigin);
+  if (allowOrigin !== "*") {
+    headers.append("Vary", "Origin");
+  }
+  const requestHeaders =
+    request.headers.get("Access-Control-Request-Headers") ||
+    "Content-Type, X-Muttr-Direction, X-Hop-Chain, X-Hop-Log";
+  headers.set("Access-Control-Allow-Headers", requestHeaders);
+  headers.set(
+    "Access-Control-Allow-Methods",
+    request.headers.get("Access-Control-Request-Method") || "POST",
+  );
+  headers.set("Access-Control-Max-Age", "86400");
+
+  return new Response(null, {
+    status: 204,
+    headers,
+  });
+}
+
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function parseBody(rawBody) {
@@ -553,6 +609,10 @@ export default {
       });
     }
 
+    if (request.method === 'OPTIONS' && url.pathname === '/api/hop') {
+      return corsPreflight(request, env);
+    }
+
     if (request.method === 'POST' && url.pathname === '/api/hop') {
       const hopName = env.HOP_NAME || 'unknown-hop';
       const direction = request.headers.get('X-Muttr-Direction') || 'forward';
@@ -565,15 +625,21 @@ export default {
       const logEntry = makeLogEntry({ hopName, direction, request });
       const log = appendLog(incomingLog, logEntry);
 
+      let response;
+
       if (direction === 'forward') {
-        return handleForward({ rawBody, env, request, chain, log, contentType });
+        response = await handleForward({ rawBody, env, request, chain, log, contentType });
+      } else if (direction === 'return') {
+        response = await handleReturn({ rawBody, env, request, chain, log });
+      } else {
+        response = new Response('Invalid direction', { status: 400 });
       }
 
-      if (direction === 'return') {
-        return handleReturn({ rawBody, env, request, chain, log });
+      if (!env.PREV_HOP_URL) {
+        return withCors(response, request, env);
       }
 
-      return new Response('Invalid direction', { status: 400 });
+      return response;
     }
 
     return new Response('Not found', { status: 404 });

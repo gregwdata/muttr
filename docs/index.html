@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>muttr · global todo telephone</title>
+    <style>
+      :root {
+        color-scheme: dark light;
+        font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: radial-gradient(circle at top left, #1f2937, #111827 50%, #0b1120);
+        color: #f9fafb;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        padding: 1.5rem;
+        gap: 1.5rem;
+      }
+
+      header {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(1.8rem, 3vw, 2.6rem);
+      }
+
+      main {
+        display: grid;
+        gap: 1.5rem;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        align-items: start;
+      }
+
+      section {
+        background: rgba(15, 23, 42, 0.72);
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        border-radius: 16px;
+        padding: 1.25rem;
+        box-shadow: 0 25px 45px rgba(15, 23, 42, 0.45);
+        backdrop-filter: blur(16px);
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      textarea {
+        min-height: 240px;
+        resize: vertical;
+        width: 100%;
+        padding: 0.75rem;
+        border-radius: 12px;
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        background: rgba(15, 23, 42, 0.6);
+        color: inherit;
+        font-size: 0.95rem;
+        line-height: 1.5;
+        font-family: "Iosevka", "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+      }
+
+      button {
+        appearance: none;
+        border: none;
+        border-radius: 999px;
+        padding: 0.75rem 1.5rem;
+        font-weight: 600;
+        font-size: 0.95rem;
+        cursor: pointer;
+        transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+        background: linear-gradient(120deg, #f97316, #ec4899);
+        color: white;
+        box-shadow: 0 18px 30px rgba(236, 72, 153, 0.35);
+      }
+
+      button:hover:not([disabled]) {
+        transform: translateY(-1px);
+        box-shadow: 0 20px 40px rgba(236, 72, 153, 0.45);
+      }
+
+      button[disabled] {
+        cursor: progress;
+        opacity: 0.65;
+        box-shadow: none;
+      }
+
+      .controls {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.35rem 0.75rem;
+        border-radius: 999px;
+        border: 1px solid rgba(148, 163, 184, 0.3);
+        font-size: 0.8rem;
+        background: rgba(15, 23, 42, 0.55);
+      }
+
+      .endpoint-control {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+      }
+
+      .endpoint-control label {
+        font-size: 0.85rem;
+        font-weight: 500;
+      }
+
+      .endpoint-control input {
+        width: 100%;
+        padding: 0.6rem 0.75rem;
+        border-radius: 10px;
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        background: rgba(15, 23, 42, 0.55);
+        color: inherit;
+        font-size: 0.85rem;
+      }
+
+      .notice {
+        font-size: 0.8rem;
+        opacity: 0.75;
+        margin: 0;
+      }
+
+      .error-message {
+        margin: 0;
+        font-size: 0.85rem;
+        color: #fca5a5;
+      }
+
+      pre {
+        margin: 0;
+        overflow: auto;
+        font-size: 0.85rem;
+        line-height: 1.5;
+        background: rgba(15, 23, 42, 0.6);
+        border-radius: 12px;
+        padding: 0.75rem;
+        max-height: 360px;
+      }
+
+      .log-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        max-height: 320px;
+        overflow: auto;
+      }
+
+      .log-item {
+        font-family: "Iosevka", "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+        font-size: 0.8rem;
+        white-space: pre-wrap;
+        word-break: break-word;
+        background: rgba(15, 23, 42, 0.55);
+        border-radius: 12px;
+        padding: 0.65rem;
+      }
+
+      footer {
+        opacity: 0.6;
+        font-size: 0.75rem;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>muttr: the borderless todo telephone</h1>
+      <p>Everything you type goes on a global sightseeing tour through a daisy-chained LLM relay.</p>
+    </header>
+
+    <main>
+      <section>
+        <h2>Seed the chaos</h2>
+        <textarea id="seed" placeholder="Plant your initial todo vibe here...">- plan launch party
+- check rocket fuel levels
+- convince the parrot we're serious explorers</textarea>
+        <div class="endpoint-control">
+          <label for="endpoint">First hop endpoint</label>
+          <input
+            id="endpoint"
+            type="url"
+            inputmode="url"
+            placeholder="https://us-east.yourdomain.com/api/hop"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <p id="endpoint-notice" class="notice"></p>
+          <p id="error" class="error-message" hidden></p>
+        </div>
+        <div class="controls">
+          <button id="start">Start Global Loop</button>
+          <button id="stop" disabled>Stop</button>
+          <span class="badge">iteration: <span id="iterations">0</span></span>
+          <span class="badge">status: <span id="status">idle</span></span>
+        </div>
+      </section>
+
+      <section>
+        <h2>Assistant whisper</h2>
+        <pre id="assistant">(no assistant response yet)</pre>
+      </section>
+
+      <section>
+        <h2>Hop chain</h2>
+        <pre id="chain">(awaiting first run)</pre>
+        <h3>Hop log</h3>
+        <ul id="log" class="log-list"></ul>
+      </section>
+
+      <section>
+        <h2>Raw OpenRouter JSON</h2>
+        <pre id="raw">(awaiting data)</pre>
+      </section>
+    </main>
+
+    <footer>
+      <p>There is no storage. Only vibes. Powered by Cloudflare Workers + OpenRouter.</p>
+    </footer>
+
+    <script>
+      const seed = document.querySelector('#seed');
+      const startBtn = document.querySelector('#start');
+      const stopBtn = document.querySelector('#stop');
+      const iterationsEl = document.querySelector('#iterations');
+      const statusEl = document.querySelector('#status');
+      const assistantEl = document.querySelector('#assistant');
+      const chainEl = document.querySelector('#chain');
+      const logEl = document.querySelector('#log');
+      const rawEl = document.querySelector('#raw');
+      const endpointInput = document.querySelector('#endpoint');
+      const endpointNotice = document.querySelector('#endpoint-notice');
+      const errorEl = document.querySelector('#error');
+
+      const runningOnGitHubPages = window.location.hostname.endsWith('github.io');
+      const defaultEndpoint = runningOnGitHubPages ? '' : '/api/hop';
+      if (defaultEndpoint) {
+        endpointInput.value = defaultEndpoint;
+        endpointNotice.textContent = 'Defaulting to relative /api/hop for self-hosted deployments.';
+      } else {
+        endpointNotice.textContent = 'Add the URL to your first Cloudflare Worker hop (e.g. https://us-east.example.com/api/hop).';
+      }
+
+      let running = false;
+      let iteration = 0;
+      let currentPayload = '';
+      let currentEndpoint = defaultEndpoint || '';
+
+      function setStatus(text) {
+        statusEl.textContent = text;
+      }
+
+      function showError(message) {
+        if (message) {
+          errorEl.hidden = false;
+          errorEl.textContent = message;
+        } else {
+          errorEl.hidden = true;
+          errorEl.textContent = '';
+        }
+      }
+
+      function updateUI(result) {
+        if (!result) return;
+        assistantEl.textContent = result.assistant_text || '(no assistant text)';
+        chainEl.textContent = result.hop_chain || '(no chain)';
+        iterationsEl.textContent = iteration;
+        rawEl.textContent = JSON.stringify(result.openrouter_response, null, 2);
+
+        logEl.innerHTML = '';
+        (result.hop_log || []).forEach((entry) => {
+          const li = document.createElement('li');
+          li.className = 'log-item';
+          li.textContent = JSON.stringify(entry, null, 2);
+          logEl.appendChild(li);
+        });
+      }
+
+      function resolveEndpoint() {
+        const value = endpointInput.value.trim();
+        if (!value) {
+          throw new Error('Please provide the first hop endpoint URL before starting the loop.');
+        }
+        if (value.startsWith('/') || value.startsWith('http://') || value.startsWith('https://')) {
+          return value;
+        }
+        throw new Error('Endpoint must start with / for relative calls or include http(s):// for absolute URLs.');
+      }
+
+      async function runOnce(payload) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 60000);
+        try {
+          const response = await fetch(currentEndpoint, {
+            method: 'POST',
+            headers: {
+              'content-type': 'text/plain; charset=utf-8',
+              'X-Muttr-Direction': 'forward',
+            },
+            body: payload,
+            signal: controller.signal,
+            mode: 'cors',
+            credentials: 'omit',
+          });
+
+          if (!response.ok) {
+            const text = await response.text();
+            throw new Error(`Hop failed: ${response.status} ${text}`);
+          }
+
+          const result = await response.json();
+          iteration += 1;
+          updateUI(result);
+          showError('');
+          return result.assistant_text || '';
+        } catch (error) {
+          throw error;
+        } finally {
+          clearTimeout(timeout);
+        }
+      }
+
+      async function loop() {
+        if (!running) return;
+        setStatus('in-flight');
+        try {
+          currentPayload = await runOnce(currentPayload);
+          if (!running) return;
+          setStatus('waiting');
+          requestAnimationFrame(loop);
+        } catch (error) {
+          console.error(error);
+          setStatus('error');
+          showError(error.message || 'Unknown error while calling the hop endpoint.');
+          startBtn.disabled = false;
+          stopBtn.disabled = true;
+          running = false;
+        }
+      }
+
+      startBtn.addEventListener('click', () => {
+        if (running) return;
+        try {
+          currentEndpoint = resolveEndpoint();
+        } catch (error) {
+          showError(error.message);
+          setStatus('error');
+          return;
+        }
+
+        running = true;
+        iteration = 0;
+        currentPayload = seed.value.trim() || '(empty seed)';
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+        showError('');
+        setStatus('booting');
+        loop();
+      });
+
+      stopBtn.addEventListener('click', () => {
+        running = false;
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+        setStatus('stopped');
+      });
+    </script>
+  </body>
+</html>
