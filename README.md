@@ -64,6 +64,15 @@ The Cloudflare Worker script is still present for posterity but no longer powers
        --scopes /subscriptions/<SUBSCRIPTION_ID>
      ```
    - Copy the JSON output into the GitHub secret `AZURE_CREDENTIALS`.
+   - Check resource provider registration for Microsoft.Storage
+
+         az provider show --namespace Microsoft.Storage --query registrationState --output tsv
+         
+         
+      If it returns e.g. “NotRegistered” then you need to register:
+         
+         az provider register --namespace Microsoft.Storage
+      Then wait for registration to complete (may take a few minutes). 
 
 2. **Store your OpenRouter key**
    - Add `OPENROUTER_API_KEY` as a GitHub secret.
