@@ -30,7 +30,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: muttr-ui
+          projectName: muttr
           directory: docs
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
           branch: main
