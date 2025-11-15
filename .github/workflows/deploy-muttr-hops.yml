@@ -15,21 +15,134 @@ env:
   AZURE_SUBSCRIPTION_ID: ${{ fromJson(secrets.AZURE_CREDENTIALS).subscriptionId }}
 
 jobs:
-  deploy:
+  deploy-us-east:
     runs-on: ubuntu-latest
+    env:
+      APP_NAME: muttr-us-east
+      REGION: eastus
+      HOP_NAME: us-east-hop
+      NEXT_URL: https://muttr-brazil.azurewebsites.net/api/muttr
+      PREV_URL: ""
+      DELAY_MS: "100"
+      IS_FINAL: "false"
 
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Azure login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Select subscription
+        run: az account set --subscription "$AZURE_SUBSCRIPTION_ID"
+
+      - name: Ensure resource group exists
+        run: |
+          az group create \
+            --name "$AZURE_RESOURCE_GROUP" \
+            --location "$AZURE_RESOURCE_GROUP_LOCATION" \
+            --subscription "$AZURE_SUBSCRIPTION_ID"
+
+      - name: Ensure storage account exists
+        run: |
+          if ! az storage account show \
+            --subscription "$AZURE_SUBSCRIPTION_ID" \
+            -n "$AZURE_STORAGE_ACCOUNT" \
+            -g "$AZURE_RESOURCE_GROUP" >/dev/null 2>&1; then
+            az storage account create \
+              --subscription "$AZURE_SUBSCRIPTION_ID" \
+              -n "$AZURE_STORAGE_ACCOUNT" \
+              -g "$AZURE_RESOURCE_GROUP" \
+              -l "$AZURE_RESOURCE_GROUP_LOCATION" \
+              --sku Standard_LRS \
+              --kind StorageV2
+          fi
+
+      - name: Ensure function app exists
+        run: |
+          if ! az functionapp show \
+            --subscription "$AZURE_SUBSCRIPTION_ID" \
+            -g "$AZURE_RESOURCE_GROUP" \
+            -n "$APP_NAME" >/dev/null 2>&1; then
+            az functionapp create \
+              --name "$APP_NAME" \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --storage-account "$AZURE_STORAGE_ACCOUNT" \
+              --consumption-plan-location "$REGION" \
+              --runtime node \
+              --runtime-version ${{ env.AZURE_NODE_VERSION }} \
+              --functions-version 4 \
+              --os-type Linux \
+              --subscription "$AZURE_SUBSCRIPTION_ID"
+          fi
+
+      - name: Configure hop settings
+        run: |
+          SETTINGS="HOP_NAME=$HOP_NAME NEXT_HOP_URL=$NEXT_URL PREV_HOP_URL=$PREV_URL DELAY_MS=$DELAY_MS"
+
+          az functionapp config appsettings set \
+            --subscription "$AZURE_SUBSCRIPTION_ID" \
+            -g "$AZURE_RESOURCE_GROUP" \
+            -n "$APP_NAME" \
+            --settings $SETTINGS
+
+          if [ "$IS_FINAL" = "true" ]; then
+            az functionapp config appsettings set \
+              --subscription "$AZURE_SUBSCRIPTION_ID" \
+              -g "$AZURE_RESOURCE_GROUP" \
+              -n "$APP_NAME" \
+              --settings OPENROUTER_MODEL="meta-llama/llama-3.2-3b-instruct" OPENROUTER_API_KEY="${{ secrets.OPENROUTER_API_KEY }}"
+          else
+            az functionapp config appsettings delete \
+              --subscription "$AZURE_SUBSCRIPTION_ID" \
+              -g "$AZURE_RESOURCE_GROUP" \
+              -n "$APP_NAME" \
+              --setting-names OPENROUTER_API_KEY OPENROUTER_MODEL >/dev/null 2>&1 || true
+          fi
+
+      - name: Configure CORS
+        run: |
+          REQUIRED_ORIGINS=(
+            "https://gregwdata.github.io"
+            "https://muttr.materialmachinelearn.ing"
+          )
+
+          EXISTING_ORIGINS=$(az functionapp cors show \
+            --subscription "$AZURE_SUBSCRIPTION_ID" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "$APP_NAME" \
+            --query "allowedOrigins" \
+            -o tsv || true)
+
+          for ORIGIN in "${REQUIRED_ORIGINS[@]}"; do
+            if ! printf '%s\n' "$EXISTING_ORIGINS" | grep -Fxq "$ORIGIN"; then
+              az functionapp cors add \
+                --subscription "$AZURE_SUBSCRIPTION_ID" \
+                --resource-group "$AZURE_RESOURCE_GROUP" \
+                --name "$APP_NAME" \
+                --allowed-origins "$ORIGIN"
+            fi
+          done
+
+      - name: Deploy to Azure Functions
+        uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ env.APP_NAME }}
+          package: ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
+
+  deploy-remaining:
+    needs: deploy-us-east
+    runs-on: ubuntu-latest
     strategy:
-      max-parallel: 1
       matrix:
         hop:
-          - name: muttr-us-east
-            region: eastus
-            hopName: us-east-hop
-            nextUrl: https://muttr-brazil.azurewebsites.net/api/muttr
-            prevUrl: ""
-            delayMs: "100"
-            isFinal: "false"
-
           - name: muttr-brazil
             region: brazilsouth
             hopName: brazil-hop
@@ -61,6 +174,14 @@ jobs:
             prevUrl: https://muttr-singapore.azurewebsites.net/api/muttr
             delayMs: "400"
             isFinal: "true"
+    env:
+      APP_NAME: ${{ matrix.hop.name }}
+      REGION: ${{ matrix.hop.region }}
+      HOP_NAME: ${{ matrix.hop.hopName }}
+      NEXT_URL: ${{ matrix.hop.nextUrl }}
+      PREV_URL: ${{ matrix.hop.prevUrl }}
+      DELAY_MS: ${{ matrix.hop.delayMs }}
+      IS_FINAL: ${{ matrix.hop.isFinal }}
 
     steps:
       - name: Checkout
@@ -86,27 +207,8 @@ jobs:
             --location "$AZURE_RESOURCE_GROUP_LOCATION" \
             --subscription "$AZURE_SUBSCRIPTION_ID"
 
-      - name: Ensure storage account exists
-        if: matrix.hop.name == 'muttr-us-east'
-        run: |
-          if ! az storage account show \
-            --subscription "$AZURE_SUBSCRIPTION_ID" \
-            -n "$AZURE_STORAGE_ACCOUNT" \
-            -g "$AZURE_RESOURCE_GROUP" >/dev/null 2>&1; then
-            az storage account create \
-              --subscription "$AZURE_SUBSCRIPTION_ID" \
-              -n "$AZURE_STORAGE_ACCOUNT" \
-              -g "$AZURE_RESOURCE_GROUP" \
-              -l "$AZURE_RESOURCE_GROUP_LOCATION" \
-              --sku Standard_LRS \
-              --kind StorageV2
-          fi
-
       - name: Ensure function app exists
         run: |
-          APP_NAME="${{ matrix.hop.name }}"
-          REGION="${{ matrix.hop.region }}"
-
           if ! az functionapp show \
             --subscription "$AZURE_SUBSCRIPTION_ID" \
             -g "$AZURE_RESOURCE_GROUP" \
@@ -125,9 +227,7 @@ jobs:
 
       - name: Configure hop settings
         run: |
-          APP_NAME="${{ matrix.hop.name }}"
-
-          SETTINGS="HOP_NAME=${{ matrix.hop.hopName }} NEXT_HOP_URL=${{ matrix.hop.nextUrl }} PREV_HOP_URL=${{ matrix.hop.prevUrl }} DELAY_MS=${{ matrix.hop.delayMs }}"
+          SETTINGS="HOP_NAME=$HOP_NAME NEXT_HOP_URL=$NEXT_URL PREV_HOP_URL=$PREV_URL DELAY_MS=$DELAY_MS"
 
           az functionapp config appsettings set \
             --subscription "$AZURE_SUBSCRIPTION_ID" \
@@ -135,7 +235,7 @@ jobs:
             -n "$APP_NAME" \
             --settings $SETTINGS
 
-          if [ "${{ matrix.hop.isFinal }}" = "true" ]; then
+          if [ "$IS_FINAL" = "true" ]; then
             az functionapp config appsettings set \
               --subscription "$AZURE_SUBSCRIPTION_ID" \
               -g "$AZURE_RESOURCE_GROUP" \
@@ -151,7 +251,6 @@ jobs:
 
       - name: Configure CORS
         run: |
-          APP_NAME="${{ matrix.hop.name }}"
           REQUIRED_ORIGINS=(
             "https://gregwdata.github.io"
             "https://muttr.materialmachinelearn.ing"
@@ -177,5 +276,5 @@ jobs:
       - name: Deploy to Azure Functions
         uses: Azure/functions-action@v1
         with:
-          app-name: ${{ matrix.hop.name }}
+          app-name: ${{ env.APP_NAME }}
           package: ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
