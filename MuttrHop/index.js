@@ -7,10 +7,13 @@ module.exports = async function (context, req) {
   const DELAY_MS = parseInt(process.env.DELAY_MS || "0", 10);
   const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || null;
   const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || "openai/gpt-4o-mini";
+  const DEFAULT_SYSTEM_PROMPT =
+    "You are a chaotic todo-list game of telephone. Repeat and mutate this list as you see fit.";
 
   const urlPath = req.originalUrl || "/api/muttr";
 
   const direction = req.headers["x-direction"] || "forward";
+  const incomingContentType = req.headers["content-type"] || "text/plain";
 
   const origin = req.headers.origin;
   const corsHeaders = {
@@ -145,9 +148,9 @@ module.exports = async function (context, req) {
     return protocol.replace(/:$/, "");
   }
 
-  async function callHop(targetUrl, newDirection, bodyStr) {
+  async function callHop(targetUrl, newDirection, bodyStr, contentType = "text/plain") {
     const headers = {
-      "Content-Type": "text/plain",
+      "Content-Type": contentType,
       "X-Hop-Chain": newChain,
       "X-Hop-Log": newLogHeader,
       "X-Direction": newDirection
@@ -200,7 +203,7 @@ module.exports = async function (context, req) {
 
   if (direction === "forward") {
     if (NEXT_HOP_URL) {
-      return callHop(NEXT_HOP_URL, "forward", body);
+      return callHop(NEXT_HOP_URL, "forward", body, incomingContentType);
     }
 
     if (!OPENROUTER_API_KEY) {
@@ -208,19 +211,162 @@ module.exports = async function (context, req) {
       return;
     }
 
-    const userMessage =
-      body ||
-      "You are a chaotic todo-list game of telephone. Repeat and mutate this list as you see fit.";
+    let parsedPayload = null;
+    if (body) {
+      try {
+        parsedPayload = JSON.parse(body);
+      } catch (err) {
+        parsedPayload = null;
+      }
+    }
+
+    function normalizeMessage(msg) {
+      if (!msg || typeof msg !== "object") {
+        return null;
+      }
+
+      const role = typeof msg.role === "string" ? msg.role.trim().toLowerCase() : null;
+      if (!role) {
+        return null;
+      }
+
+      let content = msg.content;
+      if (Array.isArray(content)) {
+        content = content
+          .map((part) => {
+            if (typeof part === "string") {
+              return part;
+            }
+            if (part && typeof part === "object" && typeof part.text === "string") {
+              return part.text;
+            }
+            return "";
+          })
+          .join("");
+      }
+
+      if (content === undefined || content === null) {
+        return null;
+      }
+
+      if (typeof content !== "string") {
+        content = String(content);
+      }
+
+      const trimmed = content.trim();
+      if (!trimmed) {
+        return null;
+      }
+
+      return { role, content: trimmed };
+    }
+
+    function extractMessagesFromPayload(payload) {
+      if (!payload || typeof payload !== "object") {
+        return null;
+      }
+
+      if (Array.isArray(payload.messages)) {
+        const normalized = payload.messages
+          .map(normalizeMessage)
+          .filter((entry) => entry !== null);
+        if (normalized.length > 0) {
+          return normalized;
+        }
+      }
+
+      const systemPrompt =
+        typeof payload.system_prompt === "string"
+          ? payload.system_prompt
+          : typeof payload.systemPrompt === "string"
+          ? payload.systemPrompt
+          : null;
+
+      const userMessagesRaw = Array.isArray(payload.user_messages)
+        ? payload.user_messages
+        : Array.isArray(payload.userMessages)
+        ? payload.userMessages
+        : [];
+
+      const normalizedUsers = userMessagesRaw
+        .map((entry) => {
+          if (typeof entry === "string") {
+            return entry;
+          }
+          if (entry && typeof entry === "object" && typeof entry.content === "string") {
+            return entry.content;
+          }
+          return null;
+        })
+        .filter((entry) => typeof entry === "string" && entry.trim().length > 0);
+
+      if (!systemPrompt && normalizedUsers.length === 0) {
+        return null;
+      }
+
+      const messages = [];
+      if (systemPrompt && systemPrompt.trim().length > 0) {
+        messages.push({ role: "system", content: systemPrompt.trim() });
+      }
+      messages.push(
+        ...normalizedUsers.map((content) => ({ role: "user", content: content.trim() }))
+      );
+
+      return messages.length > 0 ? messages : null;
+    }
+
+    let requestMessages = extractMessagesFromPayload(parsedPayload);
+    if (!requestMessages) {
+      const fallbackUser = typeof body === "string" && body.trim().length > 0 ? body.trim() : null;
+      requestMessages = [
+        { role: "system", content: DEFAULT_SYSTEM_PROMPT },
+        { role: "user", content: fallbackUser || DEFAULT_SYSTEM_PROMPT }
+      ];
+    }
+
+    const allowedForwardKeys = [
+      "response_format",
+      "stop",
+      "stream",
+      "max_tokens",
+      "temperature",
+      "tools",
+      "tool_choice",
+      "seed",
+      "top_p",
+      "top_k",
+      "frequency_penalty",
+      "presence_penalty",
+      "repetition_penalty",
+      "logit_bias",
+      "top_logprobs",
+      "min_p",
+      "top_a",
+      "prediction",
+      "transforms",
+      "models",
+      "route",
+      "provider",
+      "user"
+    ];
+
+    const requestModel =
+      parsedPayload && typeof parsedPayload.model === "string" && parsedPayload.model.trim().length > 0
+        ? parsedPayload.model.trim()
+        : OPENROUTER_MODEL;
 
     const openRouterReqBody = {
-      model: OPENROUTER_MODEL,
-      messages: [
-        {
-          role: "user",
-          content: userMessage
-        }
-      ]
+      model: requestModel,
+      messages: requestMessages
     };
+
+    if (parsedPayload && typeof parsedPayload === "object") {
+      allowedForwardKeys.forEach((key) => {
+        if (Object.prototype.hasOwnProperty.call(parsedPayload, key)) {
+          openRouterReqBody[key] = parsedPayload[key];
+        }
+      });
+    }
 
     const refererHost = deriveSelfHostname();
     const refererProtocol = deriveSelfProtocol();
@@ -262,7 +408,7 @@ module.exports = async function (context, req) {
     const orText = await orResp.text();
 
     if (PREV_HOP_URL) {
-      return callHop(PREV_HOP_URL, "return", orText);
+      return callHop(PREV_HOP_URL, "return", orText, "application/json");
     }
 
     setResponse(
@@ -281,7 +427,7 @@ module.exports = async function (context, req) {
     const llmResponseBody = body;
 
     if (PREV_HOP_URL) {
-      return callHop(PREV_HOP_URL, "return", llmResponseBody);
+      return callHop(PREV_HOP_URL, "return", llmResponseBody, "application/json");
     }
 
     let parsed;

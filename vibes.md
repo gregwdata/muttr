@@ -63,6 +63,8 @@ Legacy Cloudflare Worker prototype retained for historical reference. No longer 
 
 ## 🛠 Implementation Log
 
+- **2025-02-26** – Gated the Azure Functions deployment workflow behind path filters and pushed full OpenRouter prompt control into the UI with a dev-only system prompt editor plus a "modify the burden" injector.
+
 - **2025-02-25** – Let the Azure deployment workflow run the US East hop first and then fan out to the remaining regions concurrently.
 - **2025-02-24** – Derived the OpenRouter HTTP-Referer header from the executing host/protocol so each hop correctly self-identifies.
 - **2025-02-23** – Sanitized hop log headers to JSON-encode the log entries so Azure Functions no longer attempts to send newline-delimited strings that Undici rejects.

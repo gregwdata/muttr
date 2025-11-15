@@ -3,6 +3,10 @@ name: Deploy muttr Azure Functions (global hops)
 on:
   push:
     branches: [ main ]
+    paths:
+      - 'MuttrHop/**'
+      - 'host.json'
+      - '.github/workflows/deploy-muttr-hops.yml'
   workflow_dispatch:
 
 env:
