@@ -587,3 +587,6 @@ wrangler deploy --env sydney
 
 - **2025-02-14** – Added GitHub Pages static UI (`docs/index.html`) with configurable first-hop endpoint input and gave the Worker CORS superpowers (`CORS_ALLOW_ORIGIN`) so the static site can loop the relay across origins.
 - **2025-11-14** – Bootstrapped the unified `src/worker.mjs` Cloudflare Worker implementing the relay API, global hop logging, OpenRouter integration, and the browser UI loop described above.
+- **2025-02-15** – Drafted the top-level `README.md` with Cloudflare deployment steps and a sample GitHub Actions workflow for continuous relay releases.
+- **2025-02-16** – Checked in the real `.github/workflows/cloudflare-relay-deploy.yml` so pushes to `main` can automatically redeploy every Cloudflare hop.
+- **2025-02-16** – Materialized `wrangler.toml` in-repo and pointed the README instructions at it so GitHub Actions deployments have a real config to consume.
