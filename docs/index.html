@@ -4,6 +4,17 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>muttr · global todo telephone</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-o9N1j7kCpk//4cw3AV2uy1S8MaqkOawx2UY8ailqXFw="
+      crossorigin=""
+    />
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-XQoYMqMTK8LvdlDXvxdgZGH5f9s74pNgMDwWv6f5pFg="
+      crossorigin=""
+    ></script>
     <style>
       :root {
         color-scheme: dark light;
@@ -209,6 +220,29 @@
         padding: 0.65rem;
       }
 
+      #map {
+        width: 100%;
+        min-height: 320px;
+        height: clamp(320px, 35vw, 500px);
+        border-radius: 16px;
+        overflow: hidden;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.35);
+      }
+
+      .leaflet-container {
+        font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: rgba(15, 23, 42, 0.85);
+      }
+
+      .map-orb {
+        width: 18px;
+        height: 18px;
+        border-radius: 999px;
+        background: radial-gradient(circle at center, rgba(251, 113, 133, 0.95) 0%, rgba(249, 115, 22, 0.85) 45%, rgba(15, 23, 42, 0) 70%);
+        box-shadow: 0 0 18px rgba(249, 115, 22, 0.8), 0 0 32px rgba(236, 72, 153, 0.65);
+      }
+
       footer {
         opacity: 0.6;
         font-size: 0.75rem;
@@ -281,6 +315,12 @@
       </section>
 
       <section>
+        <h2>Global hop map</h2>
+        <p class="dev-note">Each leg renders using the latest round trip timestamps. Watch the orb trace the last lap in real time.</p>
+        <div id="map" role="img" aria-label="World map showing the muttr hop path"></div>
+      </section>
+
+      <section>
         <h2>Raw OpenRouter JSON</h2>
         <pre id="raw">(awaiting data)</pre>
       </section>
@@ -305,6 +345,257 @@
       const logEl = document.querySelector('#log');
       const rawEl = document.querySelector('#raw');
       const errorEl = document.querySelector('#error');
+      const mapEl = document.querySelector('#map');
+
+      const HOP_COORDINATES = {
+        'muttr-us-east': { label: 'US East · Virginia, USA', lat: 37.505, lng: -77.320 },
+        'muttr-brazil': { label: 'Brazil · São Paulo', lat: -23.5505, lng: -46.6333 },
+        'muttr-uk': { label: 'United Kingdom · London', lat: 51.5072, lng: -0.1276 },
+        'muttr-singapore': { label: 'Singapore', lat: 1.3521, lng: 103.8198 },
+        'muttr-sydney': { label: 'Australia · Sydney', lat: -33.8688, lng: 151.2093 }
+      };
+
+      const mapState = {
+        map: null,
+        markers: new Map(),
+        routeLine: null,
+        orbMarker: null,
+        animationFrame: null,
+        hasFitBounds: false
+      };
+
+      function initMap() {
+        if (!mapEl || typeof L === 'undefined') {
+          return null;
+        }
+        if (mapState.map) {
+          return mapState.map;
+        }
+
+        mapState.map = L.map(mapEl, {
+          worldCopyJump: true,
+          attributionControl: false,
+          zoomControl: false
+        }).setView([15, 0], 2);
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+          maxZoom: 7,
+          subdomains: 'abcd'
+        }).addTo(mapState.map);
+
+        L.control.zoom({ position: 'bottomright' }).addTo(mapState.map);
+        ensureHopMarkers();
+        setTimeout(() => {
+          mapState.map.invalidateSize();
+        }, 200);
+        return mapState.map;
+      }
+
+      function ensureHopMarkers() {
+        if (!mapState.map) return;
+        Object.entries(HOP_COORDINATES).forEach(([key, detail]) => {
+          if (mapState.markers.has(key)) return;
+          const marker = L.circleMarker([detail.lat, detail.lng], {
+            radius: 6,
+            color: '#94a3b8',
+            weight: 1.2,
+            fillColor: '#94a3b8',
+            fillOpacity: 0.3,
+            opacity: 0.8
+          }).addTo(mapState.map);
+          marker.bindTooltip(`${detail.label}\n${key}`, { sticky: true });
+          mapState.markers.set(key, marker);
+        });
+      }
+
+      function normalizeHopLogEntry(entry) {
+        if (!entry || typeof entry !== 'object') {
+          return null;
+        }
+        const hop = typeof entry.hop === 'string' ? entry.hop.trim() : '';
+        if (!hop || !HOP_COORDINATES[hop]) {
+          return null;
+        }
+        const detail = HOP_COORDINATES[hop];
+        const timestampMs = Date.parse(entry.timestamp);
+        return {
+          hop,
+          direction: typeof entry.direction === 'string' ? entry.direction : '',
+          timestamp: Number.isNaN(timestampMs) ? null : timestampMs,
+          lat: detail.lat,
+          lng: detail.lng,
+          label: detail.label
+        };
+      }
+
+      function updateMapWithHopLog(entries) {
+        const map = initMap();
+        if (!map) {
+          return [];
+        }
+
+        const normalized = [];
+        if (Array.isArray(entries)) {
+          entries.forEach((entry) => {
+            const normalizedEntry = normalizeHopLogEntry(entry);
+            if (normalizedEntry) {
+              normalized.push(normalizedEntry);
+            }
+          });
+        }
+
+        const latLngs = normalized.map((point) => [point.lat, point.lng]);
+
+        if (latLngs.length > 0) {
+          if (!mapState.routeLine) {
+            mapState.routeLine = L.polyline(latLngs, {
+              color: '#38bdf8',
+              weight: 3,
+              opacity: 0.7,
+              dashArray: '10 8'
+            }).addTo(map);
+          } else {
+            mapState.routeLine.setLatLngs(latLngs);
+          }
+
+          if (!mapState.hasFitBounds && latLngs.length >= 2) {
+            map.fitBounds(L.latLngBounds(latLngs).pad(0.3));
+            mapState.hasFitBounds = true;
+          }
+        } else if (mapState.routeLine) {
+          mapState.routeLine.setLatLngs([]);
+        }
+
+        mapState.markers.forEach((marker) => {
+          marker.setStyle({
+            color: '#94a3b8',
+            fillColor: '#94a3b8',
+            fillOpacity: 0.3
+          });
+        });
+
+        normalized.forEach((point) => {
+          const marker = mapState.markers.get(point.hop);
+          if (marker) {
+            marker.setStyle({
+              color: '#f97316',
+              fillColor: '#f97316',
+              fillOpacity: 0.85
+            });
+          }
+        });
+
+        return normalized;
+      }
+
+      function ensureOrbMarker(point) {
+        const map = initMap();
+        if (!map || !point) {
+          return null;
+        }
+
+        if (!mapState.orbMarker) {
+          const orbIcon = L.divIcon({ className: 'map-orb', iconSize: [18, 18] });
+          mapState.orbMarker = L.marker([point.lat, point.lng], {
+            icon: orbIcon,
+            interactive: false
+          }).addTo(map);
+        } else {
+          mapState.orbMarker.setLatLng([point.lat, point.lng]);
+          if (!map.hasLayer(mapState.orbMarker)) {
+            mapState.orbMarker.addTo(map);
+          }
+        }
+
+        mapState.orbMarker.setOpacity(1);
+        return mapState.orbMarker;
+      }
+
+      function hideOrbMarker() {
+        if (mapState.orbMarker) {
+          mapState.orbMarker.setOpacity(0);
+        }
+      }
+
+      function startOrbAnimation(routePoints) {
+        if (mapState.animationFrame) {
+          cancelAnimationFrame(mapState.animationFrame);
+          mapState.animationFrame = null;
+        }
+
+        const map = initMap();
+        if (!map || !Array.isArray(routePoints) || routePoints.length === 0) {
+          hideOrbMarker();
+          return;
+        }
+
+        if (routePoints.length === 1) {
+          ensureOrbMarker(routePoints[0]);
+          return;
+        }
+
+        const timeline = routePoints.filter((point) => Number.isFinite(point.timestamp));
+
+        if (timeline.length < 2) {
+          ensureOrbMarker(routePoints[routePoints.length - 1]);
+          return;
+        }
+
+        const segments = [];
+        let cumulative = 0;
+        for (let i = 1; i < timeline.length; i += 1) {
+          const prev = timeline[i - 1];
+          const current = timeline[i];
+          const duration = Math.max(current.timestamp - prev.timestamp, 1);
+          segments.push({
+            from: prev,
+            to: current,
+            start: cumulative,
+            duration,
+            end: cumulative + duration
+          });
+          cumulative += duration;
+        }
+
+        if (segments.length === 0) {
+          ensureOrbMarker(timeline[timeline.length - 1]);
+          return;
+        }
+
+        const orb = ensureOrbMarker(timeline[0]);
+        if (!orb) return;
+
+        const totalDuration = segments[segments.length - 1].end;
+        const animationStart = performance.now();
+
+        function step() {
+          const elapsed = performance.now() - animationStart;
+          if (elapsed >= totalDuration) {
+            const lastPoint = segments[segments.length - 1].to;
+            orb.setLatLng([lastPoint.lat, lastPoint.lng]);
+            mapState.animationFrame = null;
+            return;
+          }
+
+          const currentTime = elapsed;
+          let active = segments[0];
+          for (let i = 0; i < segments.length; i += 1) {
+            if (currentTime <= segments[i].end) {
+              active = segments[i];
+              break;
+            }
+          }
+
+          const progress = active.duration <= 0 ? 1 : (currentTime - active.start) / active.duration;
+          const clamped = Math.max(0, Math.min(1, progress));
+          const lat = active.from.lat + (active.to.lat - active.from.lat) * clamped;
+          const lng = active.from.lng + (active.to.lng - active.from.lng) * clamped;
+          orb.setLatLng([lat, lng]);
+          mapState.animationFrame = requestAnimationFrame(step);
+        }
+
+        mapState.animationFrame = requestAnimationFrame(step);
+      }
 
       let running = false;
       let iteration = 0;
@@ -329,6 +620,8 @@
       }
 
       refreshUpdateNote();
+
+      initMap();
 
       function queueUpdate(text) {
         const trimmed = typeof text === 'string' ? text.trim() : '';
@@ -358,7 +651,7 @@
       }
 
       function updateUI(result) {
-        if (!result) return;
+        if (!result) return [];
         assistantEl.textContent = result.assistant_text || '(no assistant text)';
         chainEl.textContent = result.hop_chain || '(no chain)';
         rawEl.textContent = result.openrouter_response
@@ -372,6 +665,8 @@
           li.textContent = JSON.stringify(entry, null, 2);
           logEl.appendChild(li);
         });
+
+        return updateMapWithHopLog(result.hop_log || []);
       }
 
       function buildRequestPayload() {
@@ -439,10 +734,11 @@
           iteration += 1;
           iterationsEl.textContent = iteration;
           lastAssistantText = result && result.assistant_text ? result.assistant_text : '';
-          updateUI(result);
+          const routePoints = updateUI(result);
           showError('');
           if (!running) return;
           setStatus('waiting');
+          startOrbAnimation(routePoints);
           requestAnimationFrame(loop);
         } catch (error) {
           console.error(error);
@@ -480,6 +776,11 @@
         stopBtn.disabled = false;
         showError('');
         setStatus('booting');
+        if (mapState.animationFrame) {
+          cancelAnimationFrame(mapState.animationFrame);
+          mapState.animationFrame = null;
+        }
+        hideOrbMarker();
         loop();
       });
 
@@ -488,6 +789,11 @@
         startBtn.disabled = false;
         stopBtn.disabled = true;
         setStatus('stopped');
+        if (mapState.animationFrame) {
+          cancelAnimationFrame(mapState.animationFrame);
+          mapState.animationFrame = null;
+        }
+        hideOrbMarker();
       });
     </script>
   </body>

@@ -4,7 +4,6 @@ module.exports = async function (context, req) {
   const HOP_NAME = process.env.HOP_NAME || "unknown-hop";
   const NEXT_HOP_URL = process.env.NEXT_HOP_URL || null;
   const PREV_HOP_URL = process.env.PREV_HOP_URL || null;
-  const DELAY_MS = parseInt(process.env.DELAY_MS || "0", 10);
   const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || null;
   const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || "openai/gpt-4o-mini";
   const DEFAULT_SYSTEM_PROMPT =
@@ -84,7 +83,7 @@ module.exports = async function (context, req) {
     hop: HOP_NAME,
     direction,
     path: urlPath,
-    delay_ms: DELAY_MS,
+    delay_ms: 0,
     chain: newChain,
     timestamp: new Date().toISOString()
   });
@@ -93,9 +92,6 @@ module.exports = async function (context, req) {
 
   context.log(currentHopLogLine);
 
-  if (DELAY_MS > 0) {
-    await new Promise((resolve) => setTimeout(resolve, DELAY_MS));
-  }
 
   function safeParseUrl(value) {
     if (!value) {
