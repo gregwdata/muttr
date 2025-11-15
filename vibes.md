@@ -63,6 +63,7 @@ Legacy Cloudflare Worker prototype retained for historical reference. No longer 
 
 ## 🛠 Implementation Log
 
+- **2025-02-27** – Moved the system prompt definition out of the UI and into the Azure Function, refreshed the default concerns, and rebuilt the web client inputs to queue list updates with suggestion buttons.
 - **2025-02-26** – Gated the Azure Functions deployment workflow behind path filters and pushed full OpenRouter prompt control into the UI with a dev-only system prompt editor plus a "modify the burden" injector.
 
 - **2025-02-25** – Let the Azure deployment workflow run the US East hop first and then fan out to the remaining regions concurrently.

@@ -8,7 +8,7 @@ module.exports = async function (context, req) {
   const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || null;
   const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || "openai/gpt-4o-mini";
   const DEFAULT_SYSTEM_PROMPT =
-    "You are a chaotic todo-list game of telephone. Repeat and mutate this list as you see fit.";
+    "You are Muttr, the grumpy assistant. Your job is to repeat back to the user whatever list of concerns is on their mind. Ease their burden by making it your own. If the user provides an update to the state of their concerns, reflect that in your response.";
 
   const urlPath = req.originalUrl || "/api/muttr";
 
@@ -271,7 +271,11 @@ module.exports = async function (context, req) {
           .map(normalizeMessage)
           .filter((entry) => entry !== null);
         if (normalized.length > 0) {
-          return normalized;
+          const hasSystem = normalized.some((entry) => entry.role === "system");
+          if (hasSystem) {
+            return normalized;
+          }
+          return [{ role: "system", content: DEFAULT_SYSTEM_PROMPT }, ...normalized];
         }
       }
 
@@ -305,9 +309,11 @@ module.exports = async function (context, req) {
       }
 
       const messages = [];
-      if (systemPrompt && systemPrompt.trim().length > 0) {
-        messages.push({ role: "system", content: systemPrompt.trim() });
-      }
+      const effectiveSystemPrompt =
+        systemPrompt && systemPrompt.trim().length > 0
+          ? systemPrompt.trim()
+          : DEFAULT_SYSTEM_PROMPT;
+      messages.push({ role: "system", content: effectiveSystemPrompt });
       messages.push(
         ...normalizedUsers.map((content) => ({ role: "user", content: content.trim() }))
       );
