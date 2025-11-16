@@ -63,6 +63,7 @@ Legacy Cloudflare Worker prototype retained for historical reference. No longer 
 
 ## 🛠 Implementation Log
 
+- **2025-03-07** – Reworked the live relay UX so the seed textarea becomes the assistant output while runs are active, locks itself during loops, adds a renamed "Watch AI haul your burdens" map alongside it, introduces a full-width live hop manifest table, and softens the suggestion buttons.
 - **2025-11-16** – Simplified the live relay header, retitled the CTAs to “Launch muttr,” wired pricing/deck buttons to auto-scroll into the relay with prefilled anti-sales-call gripes, and retitled the control button to “Start Muttring.”
 - **2025-03-06** – Rebuilt the relay map animation so “Your Issues” glides along great-circle routes using actual hop-to-hop timing deltas, restored the dotted baseline route, and renamed the orb to match the new label.
 - **2025-03-05** – Swapped the relay UI's Leaflet globe for a Highcharts-powered map with real-time great-circle orb animation keyed to hop timings so each lap replays with the actual per-leg durations.
