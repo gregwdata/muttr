@@ -33,6 +33,9 @@ This repo now ships a real around-the-world relay implemented with **Azure Funct
 5. **Browser UI**
    - `docs/index.html` is a static viewer/loop driver that always targets the public US East Function entry hop and streams the todo list through the relay forever.
 
+6. **Audio transcription helper (US East)**
+   - `TranscribeAudio/index.js` exposes `POST /api/transcribe-audio`, accepts base64 WAV/MP3 payloads, and relays them to OpenRouter’s `google/gemini-2.0-flash-lite-001` model for speech-to-text before handing the transcript back to the UI.
+
 ---
 
 ## 📁 Repository layout
@@ -41,6 +44,9 @@ This repo now ships a real around-the-world relay implemented with **Azure Funct
 MuttrHop/          # Azure Function (single hop) implementation
   ├─ function.json # HTTP trigger binding (POST /api/muttr)
   └─ index.js      # Hop logic, OpenRouter integration, forward/return handling
+TranscribeAudio/   # Azure Function for OpenRouter-powered audio transcription (POST /api/transcribe-audio)
+  ├─ function.json
+  └─ index.js
 host.json          # Azure Functions host config
 .github/workflows/
   deploy-muttr-hops.yml  # CI/CD that provisions + deploys all Function Apps

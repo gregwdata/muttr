@@ -29,6 +29,7 @@ Key mechanics:
 2. **OpenRouter on the final forward hop.** Sydney alone holds `OPENROUTER_API_KEY`/`OPENROUTER_MODEL` and converts the todo payload into a chat completion.
 3. **Headers carry context.** `X-Hop-Chain`, `X-Hop-Log`, and `X-Direction` stitch the story together on both the forward and return legs.
 4. **Return leg unwrap.** US East parses the OpenRouter JSON, extracts the assistant text, and responds to the browser with hop telemetry plus the raw model output.
+5. **On-demand transcription.** A dedicated `transcribe-audio` function in US East accepts base64 WAV/MP3 blobs, forwards them to OpenRouter’s `google/gemini-2.0-flash-lite-001`, and hands the resulting transcript back to the UI for microphone-powered inputs.
 
 ---
 
@@ -38,6 +39,11 @@ Key mechanics:
 Single Azure Function implementation shared by all hops.
 - `function.json` – HTTP trigger binding for `POST /api/muttr`.
 - `index.js` – Forward + return logic, OpenRouter call on the terminal forward hop, response shaping on the final return.
+
+### `TranscribeAudio/`
+Azure Function that powers microphone capture.
+- `function.json` – HTTP trigger binding for `POST /api/transcribe-audio`.
+- `index.js` – Validates base64 WAV/MP3 payloads, calls OpenRouter’s transcription-capable model, and returns the transcript to the UI.
 
 ### `host.json`
 Azure Functions host configuration (v2 runtime).
@@ -63,6 +69,7 @@ Legacy Cloudflare Worker prototype retained for historical reference. No longer 
 
 ## 🛠 Implementation Log
 
+- **2025-03-14** – Added microphone capture buttons for the seed and update inputs, wired them through a new US East `transcribe-audio` Azure Function that feeds OpenRouter’s `google/gemini-2.0-flash-lite-001`, and automatically injects the transcripts back into the appropriate fields while respecting the relay’s lock state.
 - **2025-03-13** – Pointed the marketing CTA auto-fill buttons at the main relay seed input (instead of the update field) and
   removed the leftover "Launch the live relay" development copy from the landing page.
 - **2025-03-12** – Normalized Azure hop names so telemetry entries like `us-east-hop` automatically map onto the `muttr-us-east`

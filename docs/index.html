@@ -618,6 +618,95 @@
         box-shadow: 0 12px 22px rgba(249, 115, 22, 0.25);
       }
 
+      .audio-input-row {
+        display: flex;
+        justify-content: flex-end;
+        margin-bottom: 0.5rem;
+      }
+
+      .label-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+      }
+
+      .label-row label {
+        margin: 0;
+      }
+
+      .relay-app button.audio-button {
+        width: 48px;
+        height: 48px;
+        min-width: 48px;
+        padding: 0;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(99, 102, 241, 0.15);
+        border: 1px solid rgba(99, 102, 241, 0.35);
+        box-shadow: none;
+        color: rgba(191, 219, 254, 0.95);
+      }
+
+      .relay-app button.audio-button svg {
+        width: 20px;
+        height: 20px;
+        fill: currentColor;
+      }
+
+      .relay-app button.audio-button.audio-button--compact {
+        width: 36px;
+        height: 36px;
+        min-width: 36px;
+      }
+
+      .relay-app button.audio-button.is-recording {
+        background: rgba(239, 68, 68, 0.22);
+        border-color: rgba(248, 113, 113, 0.65);
+        color: #fecaca;
+        box-shadow: 0 10px 16px rgba(239, 68, 68, 0.25);
+      }
+
+      .relay-app button.audio-button.is-processing {
+        background: rgba(59, 130, 246, 0.2);
+        border-color: rgba(147, 197, 253, 0.7);
+        color: #dbeafe;
+        box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
+        animation: audioPulse 1.4s ease-in-out infinite;
+      }
+
+      @keyframes audioPulse {
+        0% {
+          box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.45);
+        }
+        70% {
+          box-shadow: 0 0 0 10px rgba(59, 130, 246, 0);
+        }
+        100% {
+          box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+        }
+      }
+
+      .relay-app button.audio-button:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+        animation: none;
+      }
+
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
       .relay-app button[disabled] {
         cursor: progress;
         opacity: 0.65;
@@ -1229,11 +1318,43 @@
           <div class="relay-app__grid">
             <section class="relay-app__panel">
               <h2>Place your concerns here</h2>
+              <div class="audio-input-row">
+                <button
+                  type="button"
+                  class="audio-button"
+                  data-audio-target="seed"
+                  title="Audio input"
+                  aria-label="Capture audio for your main todo list"
+                >
+                  <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
+                    <path
+                      d="M12 15.5a3.5 3.5 0 0 0 3.5-3.5V6a3.5 3.5 0 0 0-7 0v6a3.5 3.5 0 0 0 3.5 3.5zm6-3.75a.75.75 0 1 1 1.5 0 6.5 6.5 0 0 1-6.25 6.49V21h2.75a.75.75 0 0 1 0 1.5h-6.5a.75.75 0 0 1 0-1.5H12v-2.76A6.5 6.5 0 0 1 6 11.75a.75.75 0 0 1 1.5 0 5 5 0 1 0 10 0z"
+                    ></path>
+                  </svg>
+                  <span class="sr-only">Capture audio for your main todo list</span>
+                </button>
+              </div>
               <textarea id="relay-seed" placeholder="List the burdens weighing you down...">- Buy groceries
 - Eat lunch
 - Mow grass
 - Do Taxes</textarea>
-              <label for="relay-update-input">Update your list</label>
+              <div class="label-row">
+                <label for="relay-update-input">Update your list</label>
+                <button
+                  type="button"
+                  class="audio-button audio-button--compact"
+                  data-audio-target="update"
+                  title="Audio input for updates"
+                  aria-label="Capture audio for your list updates"
+                >
+                  <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
+                    <path
+                      d="M12 15.5a3.5 3.5 0 0 0 3.5-3.5V6a3.5 3.5 0 0 0-7 0v6a3.5 3.5 0 0 0 3.5 3.5zm6-3.75a.75.75 0 1 1 1.5 0 6.5 6.5 0 0 1-6.25 6.49V21h2.75a.75.75 0 0 1 0 1.5h-6.5a.75.75 0 0 1 0-1.5H12v-2.76A6.5 6.5 0 0 1 6 11.75a.75.75 0 0 1 1.5 0 5 5 0 1 0 10 0z"
+                    ></path>
+                  </svg>
+                  <span class="sr-only">Capture audio for your list updates</span>
+                </button>
+              </div>
               <form id="relay-update-form" class="stack">
                 <input
                   id="relay-update-input"
@@ -1385,6 +1506,29 @@
         const hopTableHistory = [];
         const hopTableKeySet = new Set();
         const HOP_TABLE_HISTORY_LIMIT = 200;
+        const audioButtons = relayApp.querySelectorAll('[data-audio-target]');
+        const seedAudioButton = relayApp.querySelector('[data-audio-target="seed"]');
+        const updateAudioButton = relayApp.querySelector('[data-audio-target="update"]');
+        const AUDIO_TRANSCRIBE_ENDPOINT = 'https://muttr-us-east.azurewebsites.net/api/transcribe-audio';
+        const AUDIO_MAX_RECORDING_MS = 20000;
+        const AudioContextCtor =
+          typeof window !== 'undefined' ? window.AudioContext || window.webkitAudioContext : null;
+        const audioState = {
+          supported:
+            typeof window !== 'undefined' &&
+            typeof navigator !== 'undefined' &&
+            !!navigator.mediaDevices &&
+            typeof navigator.mediaDevices.getUserMedia === 'function' &&
+            typeof window.MediaRecorder !== 'undefined' &&
+            !!AudioContextCtor,
+          mediaRecorder: null,
+          stream: null,
+          chunks: [],
+          recordingButton: null,
+          recordingTarget: null,
+          stopTimer: null,
+          audioContext: null
+        };
 
         relayMessageButtons.forEach((cta) => {
           cta.addEventListener('click', (event) => {
@@ -2082,12 +2226,408 @@
 
         refreshUpdateNote();
 
+        function pickSupportedMimeType() {
+          if (typeof window === 'undefined' || typeof window.MediaRecorder === 'undefined') {
+            return '';
+          }
+          if (typeof window.MediaRecorder.isTypeSupported !== 'function') {
+            return '';
+          }
+          const candidates = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/webm'];
+          return candidates.find((type) => window.MediaRecorder.isTypeSupported(type)) || '';
+        }
+
+        function shouldDisableAudioButton(button) {
+          if (!button || !audioState.supported) {
+            return true;
+          }
+          const target = button.dataset.audioTarget || '';
+          if (target === 'seed') {
+            return seed ? seed.readOnly : true;
+          }
+          return false;
+        }
+
+        function refreshAudioButtonDisabled(button) {
+          if (!button) return;
+          const locked = shouldDisableAudioButton(button);
+          if (!button.classList.contains('is-processing')) {
+            button.disabled = locked;
+          } else {
+            button.disabled = true;
+          }
+        }
+
+        function setAudioButtonRecording(button, isRecording) {
+          if (!button) return;
+          const recording = Boolean(isRecording);
+          button.classList.toggle('is-recording', recording);
+          button.setAttribute('aria-pressed', recording ? 'true' : 'false');
+          if (!recording && !button.classList.contains('is-processing')) {
+            refreshAudioButtonDisabled(button);
+          } else if (recording) {
+            button.disabled = false;
+          }
+        }
+
+        function setAudioButtonProcessing(button, isProcessing) {
+          if (!button) return;
+          const processing = Boolean(isProcessing);
+          button.classList.toggle('is-processing', processing);
+          if (processing) {
+            button.disabled = true;
+          } else {
+            refreshAudioButtonDisabled(button);
+          }
+        }
+
+        function stopActiveRecording() {
+          if (audioState.mediaRecorder && audioState.mediaRecorder.state !== 'inactive') {
+            try {
+              audioState.mediaRecorder.stop();
+            } catch (error) {
+              console.error('Failed to stop recorder', error);
+            }
+          }
+        }
+
+        function resetAudioRecordingState() {
+          if (audioState.stopTimer) {
+            clearTimeout(audioState.stopTimer);
+            audioState.stopTimer = null;
+          }
+          audioState.mediaRecorder = null;
+          audioState.chunks = [];
+          audioState.recordingButton = null;
+          audioState.recordingTarget = null;
+        }
+
+        function cleanupAudioStream() {
+          if (audioState.stream) {
+            audioState.stream.getTracks().forEach((track) => {
+              try {
+                track.stop();
+              } catch (error) {
+                console.error('Failed to stop track', error);
+              }
+            });
+            audioState.stream = null;
+          }
+        }
+
+        async function ensureSharedAudioContext() {
+          if (!audioState.supported || !AudioContextCtor) {
+            throw new Error('Audio capture is not supported in this browser.');
+          }
+          if (!audioState.audioContext) {
+            audioState.audioContext = new AudioContextCtor();
+          }
+          if (audioState.audioContext.state === 'suspended') {
+            try {
+              await audioState.audioContext.resume();
+            } catch (error) {
+              console.warn('Unable to resume audio context', error);
+            }
+          }
+          return audioState.audioContext;
+        }
+
+        async function decodeBlobToAudioBuffer(blob) {
+          const arrayBuffer = await blob.arrayBuffer();
+          const ctx = await ensureSharedAudioContext();
+          return await new Promise((resolve, reject) => {
+            ctx.decodeAudioData(
+              arrayBuffer.slice(0),
+              (buffer) => resolve(buffer),
+              (error) => reject(error || new Error('decodeAudioData failed'))
+            );
+          });
+        }
+
+        function interleaveChannels(buffers) {
+          if (!buffers || buffers.length === 0) {
+            return new Float32Array(0);
+          }
+          if (buffers.length === 1) {
+            return buffers[0];
+          }
+          const length = buffers[0].length;
+          const result = new Float32Array(length * buffers.length);
+          for (let i = 0; i < length; i += 1) {
+            for (let channel = 0; channel < buffers.length; channel += 1) {
+              result[i * buffers.length + channel] = buffers[channel][i] || 0;
+            }
+          }
+          return result;
+        }
+
+        function audioBufferToWav(audioBuffer) {
+          const numChannels = audioBuffer.numberOfChannels || 1;
+          const sampleRate = audioBuffer.sampleRate || 44100;
+          const channelData = [];
+          for (let i = 0; i < numChannels; i += 1) {
+            channelData.push(audioBuffer.getChannelData(i));
+          }
+          const interleaved = interleaveChannels(channelData);
+          const bytesPerSample = 2;
+          const blockAlign = numChannels * bytesPerSample;
+          const buffer = new ArrayBuffer(44 + interleaved.length * bytesPerSample);
+          const view = new DataView(buffer);
+          let offset = 0;
+
+          function writeString(str) {
+            for (let i = 0; i < str.length; i += 1) {
+              view.setUint8(offset + i, str.charCodeAt(i));
+            }
+            offset += str.length;
+          }
+
+          function writeUint16(value) {
+            view.setUint16(offset, value, true);
+            offset += 2;
+          }
+
+          function writeUint32(value) {
+            view.setUint32(offset, value, true);
+            offset += 4;
+          }
+
+          writeString('RIFF');
+          writeUint32(36 + interleaved.length * bytesPerSample);
+          writeString('WAVE');
+          writeString('fmt ');
+          writeUint32(16);
+          writeUint16(1);
+          writeUint16(numChannels);
+          writeUint32(sampleRate);
+          writeUint32(sampleRate * blockAlign);
+          writeUint16(blockAlign);
+          writeUint16(8 * bytesPerSample);
+          writeString('data');
+          writeUint32(interleaved.length * bytesPerSample);
+
+          let dataOffset = 44;
+          for (let i = 0; i < interleaved.length; i += 1) {
+            const sample = Math.max(-1, Math.min(1, interleaved[i]));
+            const intSample = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+            view.setInt16(dataOffset, intSample, true);
+            dataOffset += 2;
+          }
+
+          return buffer;
+        }
+
+        function arrayBufferToBase64(buffer) {
+          let binary = '';
+          const bytes = new Uint8Array(buffer);
+          const chunkSize = 0x8000;
+          for (let i = 0; i < bytes.length; i += chunkSize) {
+            const chunk = bytes.subarray(i, i + chunkSize);
+            binary += String.fromCharCode.apply(null, chunk);
+          }
+          return btoa(binary);
+        }
+
+        async function convertBlobToWavBase64(blob) {
+          const audioBuffer = await decodeBlobToAudioBuffer(blob);
+          const wavBuffer = audioBufferToWav(audioBuffer);
+          return { base64: arrayBufferToBase64(wavBuffer), format: 'wav' };
+        }
+
+        async function sendAudioForTranscription(base64, format, target) {
+          const prompt =
+            target === 'update'
+              ? 'Transcribe this todo list update exactly as spoken. Return only the transcript.'
+              : 'Transcribe this todo list seed exactly as spoken, keeping its natural structure. Return only the transcript.';
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 45000);
+          try {
+            const response = await fetch(AUDIO_TRANSCRIBE_ENDPOINT, {
+              method: 'POST',
+              headers: {
+                'content-type': 'application/json'
+              },
+              body: JSON.stringify({
+                audio: { data: base64, format },
+                target,
+                prompt
+              }),
+              signal: controller.signal,
+              mode: 'cors',
+              credentials: 'omit'
+            });
+            const responseText = await response.text();
+            let payload = null;
+            try {
+              payload = JSON.parse(responseText);
+            } catch (error) {
+              if (response.ok) {
+                throw new Error('Audio transcription returned an unexpected response.');
+              }
+              throw new Error(responseText || 'Audio transcription failed.');
+            }
+
+            if (!response.ok) {
+              const message = payload && payload.error ? payload.error : 'Audio transcription failed.';
+              throw new Error(message);
+            }
+
+            if (!payload || typeof payload.text !== 'string' || !payload.text.trim()) {
+              throw new Error('Audio transcription returned an empty result.');
+            }
+
+            return payload.text.trim();
+          } catch (error) {
+            if (error.name === 'AbortError') {
+              throw new Error('Audio transcription timed out. Please try again.');
+            }
+            throw error;
+          } finally {
+            clearTimeout(timeout);
+          }
+        }
+
+        function applyTranscriptToInputs(target, transcript) {
+          const cleaned = typeof transcript === 'string' ? transcript.trim() : '';
+          if (!cleaned) {
+            return;
+          }
+          if (target === 'update' && updateInput) {
+            updateInput.value = cleaned;
+            updateInput.dispatchEvent(new Event('input', { bubbles: true }));
+            updateInput.focus();
+            return;
+          }
+          if (seed) {
+            const existing = seed.value || '';
+            const needsBreak = existing && !existing.endsWith('\n') ? '\n' : '';
+            seed.value = existing ? `${existing}${needsBreak}${cleaned}` : cleaned;
+            seed.dispatchEvent(new Event('input', { bubbles: true }));
+            seed.focus();
+          }
+        }
+
+        async function finalizeRecording(chunks, target, button, mimeType) {
+          cleanupAudioStream();
+          resetAudioRecordingState();
+          if (!chunks || chunks.length === 0) {
+            refreshAudioButtonDisabled(button);
+            return;
+          }
+          setAudioButtonProcessing(button, true);
+          try {
+            const blob = new Blob(chunks, { type: mimeType || 'audio/webm' });
+            const { base64, format } = await convertBlobToWavBase64(blob);
+            const transcript = await sendAudioForTranscription(base64, format, target);
+            applyTranscriptToInputs(target, transcript);
+            showError('');
+          } catch (error) {
+            console.error(error);
+            showError(error.message || 'Failed to transcribe audio. Please try again.');
+          } finally {
+            setAudioButtonProcessing(button, false);
+            refreshAudioButtonDisabled(button);
+          }
+        }
+
+        async function startRecording(button) {
+          if (!audioState.supported) {
+            showError('Audio capture is not supported in this browser.');
+            return;
+          }
+          if (!button) {
+            return;
+          }
+          const target = button.dataset.audioTarget || 'seed';
+          const mimeType = pickSupportedMimeType();
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+            audioState.stream = stream;
+            audioState.mediaRecorder = recorder;
+            audioState.chunks = [];
+            audioState.recordingButton = button;
+            audioState.recordingTarget = target;
+            setAudioButtonRecording(button, true);
+            recorder.addEventListener('dataavailable', (event) => {
+              if (event.data && event.data.size > 0) {
+                audioState.chunks.push(event.data);
+              }
+            });
+            recorder.addEventListener('stop', () => {
+              const chunksCopy = audioState.chunks.slice();
+              const targetCopy = audioState.recordingTarget;
+              const buttonCopy = audioState.recordingButton;
+              if (audioState.stopTimer) {
+                clearTimeout(audioState.stopTimer);
+                audioState.stopTimer = null;
+              }
+              setAudioButtonRecording(buttonCopy, false);
+              finalizeRecording(chunksCopy, targetCopy, buttonCopy, recorder.mimeType);
+            });
+            recorder.addEventListener('error', (event) => {
+              console.error(event.error || event);
+              showError('Recording error. Please try again.');
+              setAudioButtonRecording(button, false);
+              cleanupAudioStream();
+              resetAudioRecordingState();
+            });
+            recorder.start();
+            audioState.stopTimer = setTimeout(() => {
+              if (recorder.state === 'recording') {
+                recorder.stop();
+              }
+            }, AUDIO_MAX_RECORDING_MS);
+          } catch (error) {
+            console.error(error);
+            showError('Unable to access your microphone. Please allow permissions and try again.');
+            cleanupAudioStream();
+            resetAudioRecordingState();
+          }
+        }
+
+        function handleAudioButtonPress(button) {
+          if (!audioState.supported || !button || button.classList.contains('is-processing')) {
+            return;
+          }
+          if (audioState.mediaRecorder && audioState.mediaRecorder.state === 'recording') {
+            stopActiveRecording();
+            return;
+          }
+          startRecording(button);
+        }
+
+        function initAudioButtons() {
+          if (!audioButtons || audioButtons.length === 0) {
+            return;
+          }
+          if (!audioState.supported) {
+            audioButtons.forEach((button) => {
+              if (!button) return;
+              button.disabled = true;
+              button.title = 'Audio capture is not supported in this browser.';
+            });
+            return;
+          }
+          audioButtons.forEach((button) => {
+            if (!button) return;
+            button.setAttribute('aria-pressed', 'false');
+            refreshAudioButtonDisabled(button);
+            button.addEventListener('click', () => handleAudioButtonPress(button));
+          });
+        }
+
         initMap();
+        initAudioButtons();
 
         function setSeedEditable(isEditable) {
           if (!seed) return;
           seed.readOnly = !isEditable;
           seed.classList.toggle('relay-seed--locked', !isEditable);
+          if (!isEditable && audioState.recordingTarget === 'seed') {
+            stopActiveRecording();
+          }
+          refreshAudioButtonDisabled(seedAudioButton);
         }
 
         setSeedEditable(true);
