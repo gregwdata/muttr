@@ -538,10 +538,23 @@
         line-height: 1.5;
         font-family: "Iosevka", "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo,
           monospace;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        word-break: break-word;
       }
 
       .relay-app textarea.compact {
         min-height: 120px;
+      }
+
+      .relay-app textarea.relay-seed--locked {
+        background: rgba(15, 23, 42, 0.4);
+        border-color: rgba(148, 163, 184, 0.35);
+        cursor: not-allowed;
+      }
+
+      .relay-app__panel--wide {
+        grid-column: 1 / -1;
       }
 
       .relay-app .text-input {
@@ -595,6 +608,12 @@
         padding: 0.6rem 1.1rem;
       }
 
+      .relay-app button.secondary-button.suggestion-button {
+        background: rgba(249, 115, 22, 0.15);
+        color: rgba(249, 115, 22, 0.85);
+        border-color: rgba(249, 115, 22, 0.35);
+      }
+
       .relay-app button.secondary-button:hover:not([disabled]) {
         box-shadow: 0 12px 22px rgba(249, 115, 22, 0.25);
       }
@@ -610,6 +629,53 @@
         gap: 0.75rem;
         flex-wrap: wrap;
         align-items: center;
+      }
+
+      .hop-table-wrapper {
+        border-radius: 12px;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        background: rgba(2, 6, 23, 0.45);
+        overflow: hidden;
+      }
+
+      .hop-table-scroll {
+        max-height: 300px;
+        overflow: auto;
+      }
+
+      table.hop-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+      }
+
+      table.hop-table thead {
+        position: sticky;
+        top: 0;
+        background: rgba(15, 23, 42, 0.85);
+        backdrop-filter: blur(8px);
+        z-index: 1;
+      }
+
+      table.hop-table th,
+      table.hop-table td {
+        padding: 0.65rem 0.75rem;
+        text-align: left;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+        white-space: nowrap;
+      }
+
+      table.hop-table td:nth-child(1) {
+        font-weight: 600;
+        color: #fbbf24;
+      }
+
+      table.hop-table td:nth-child(3) {
+        font-variant-numeric: tabular-nums;
+      }
+
+      table.hop-table tbody tr:last-child td {
+        border-bottom: none;
       }
 
       .relay-app .stack {
@@ -1212,26 +1278,29 @@
             </section>
 
             <section class="relay-app__panel">
-              <h2>Assistant whisper</h2>
-              <pre id="relay-assistant">(no assistant response yet)</pre>
-            </section>
-
-            <section class="relay-app__panel">
-              <h2>Hop chain</h2>
-              <pre id="relay-chain">(awaiting first run)</pre>
-              <h3>Hop log</h3>
-              <ul id="relay-log" class="log-list"></ul>
-            </section>
-
-            <section class="relay-app__panel">
-              <h2>Global hop map</h2>
+              <h2>Watch AI haul your burdens around Earth</h2>
               <p class="dev-note">Each leg renders using the latest round trip timestamps. Watch Your Issues trace the last lap in real time.</p>
               <div id="relay-map" role="img" aria-label="World map showing the muttr hop path"></div>
             </section>
 
-            <section class="relay-app__panel">
-              <h2>Raw OpenRouter JSON</h2>
-              <pre id="relay-raw">(awaiting data)</pre>
+            <section class="relay-app__panel relay-app__panel--wide">
+              <h2>Live hop manifest</h2>
+              <p class="dev-note">Newest hops land at the top so you can follow the payload’s reverse-chronological gossip.</p>
+              <div class="hop-table-wrapper" role="region" aria-live="polite" aria-label="Live hop telemetry">
+                <div class="hop-table-scroll">
+                  <table class="hop-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">Hop</th>
+                        <th scope="col">Direction</th>
+                        <th scope="col">Delay</th>
+                        <th scope="col">Timestamp</th>
+                      </tr>
+                    </thead>
+                    <tbody id="relay-hop-table"></tbody>
+                  </table>
+                </div>
+              </div>
             </section>
           </div>
           <footer class="relay-app__footer">
@@ -1316,10 +1385,7 @@
         const stopBtn = relayApp.querySelector('#relay-stop');
         const iterationsEl = relayApp.querySelector('#relay-iterations');
         const statusEl = relayApp.querySelector('#relay-status');
-        const assistantEl = relayApp.querySelector('#relay-assistant');
-        const chainEl = relayApp.querySelector('#relay-chain');
-        const logEl = relayApp.querySelector('#relay-log');
-        const rawEl = relayApp.querySelector('#relay-raw');
+        const hopTableBody = relayApp.querySelector('#relay-hop-table');
         const errorEl = relayApp.querySelector('#relay-error');
         const mapEl = relayApp.querySelector('#relay-map');
         const relaySection = document.getElementById('relay-app');
@@ -1883,6 +1949,14 @@
 
         initMap();
 
+        function setSeedEditable(isEditable) {
+          if (!seed) return;
+          seed.readOnly = !isEditable;
+          seed.classList.toggle('relay-seed--locked', !isEditable);
+        }
+
+        setSeedEditable(true);
+
         function queueUpdate(text) {
           const trimmed = typeof text === 'string' ? text.trim() : '';
           if (!trimmed) {
@@ -1910,23 +1984,103 @@
           }
         }
 
+        function formatDelay(entry) {
+          const delay =
+            typeof entry.delay_ms === 'number'
+              ? entry.delay_ms
+              : typeof entry.duration_ms === 'number'
+              ? entry.duration_ms
+              : null;
+          if (delay === null) {
+            return '—';
+          }
+          if (delay >= 1000) {
+            return `${(delay / 1000).toFixed(2)} s`;
+          }
+          return `${Math.round(delay)} ms`;
+        }
+
+        function formatTimestamp(value) {
+          if (!value) return '—';
+          const ms = Date.parse(value);
+          if (Number.isNaN(ms)) {
+            return '—';
+          }
+          return new Date(ms).toLocaleString(undefined, {
+            hour12: false,
+            month: 'short',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+          });
+        }
+
+        function describeHop(entry) {
+          if (!entry) {
+            return '—';
+          }
+          const hopKey = typeof entry.hop === 'string' ? entry.hop : '';
+          const detail = hopKey ? HOP_COORDINATES[hopKey] : null;
+          if (detail) {
+            return `${detail.label} (${hopKey})`;
+          }
+          if (hopKey) {
+            return hopKey;
+          }
+          if (entry.raw) {
+            return entry.raw;
+          }
+          return '—';
+        }
+
+        function updateHopTable(entries) {
+          if (!hopTableBody) return;
+          hopTableBody.innerHTML = '';
+          if (!Array.isArray(entries) || entries.length === 0) {
+            const emptyRow = document.createElement('tr');
+            const cell = document.createElement('td');
+            cell.colSpan = 4;
+            cell.textContent = 'Awaiting the first hop.';
+            emptyRow.appendChild(cell);
+            hopTableBody.appendChild(emptyRow);
+            return;
+          }
+
+          const ordered = entries.slice().reverse();
+          ordered.forEach((entry) => {
+            const row = document.createElement('tr');
+
+            const hopCell = document.createElement('td');
+            hopCell.textContent = describeHop(entry);
+            row.appendChild(hopCell);
+
+            const directionCell = document.createElement('td');
+            directionCell.textContent = entry && entry.direction ? entry.direction : '—';
+            row.appendChild(directionCell);
+
+            const delayCell = document.createElement('td');
+            delayCell.textContent = formatDelay(entry);
+            row.appendChild(delayCell);
+
+            const timestampCell = document.createElement('td');
+            timestampCell.textContent = formatTimestamp(entry && entry.timestamp ? entry.timestamp : null);
+            row.appendChild(timestampCell);
+
+            hopTableBody.appendChild(row);
+          });
+        }
+
         function updateUI(result) {
           if (!result) return [];
-          assistantEl.textContent = result.assistant_text || '(no assistant text)';
-          chainEl.textContent = result.hop_chain || '(no chain)';
-          rawEl.textContent = result.openrouter_response
-            ? JSON.stringify(result.openrouter_response, null, 2)
-            : '(no raw payload)';
-
-          logEl.innerHTML = '';
-          (result.hop_log || []).forEach((entry) => {
-            const li = document.createElement('li');
-            li.className = 'log-item';
-            li.textContent = JSON.stringify(entry, null, 2);
-            logEl.appendChild(li);
-          });
-
-          return updateMapWithHopLog(result.hop_log || []);
+          lastAssistantText = typeof result.assistant_text === 'string' ? result.assistant_text : '';
+          if (seed) {
+            const displayText = lastAssistantText || '(no assistant response yet)';
+            seed.value = displayText;
+          }
+          const hops = Array.isArray(result.hop_log) ? result.hop_log : [];
+          updateHopTable(hops);
+          return updateMapWithHopLog(hops);
         }
 
         function buildRequestPayload() {
@@ -1993,7 +2147,6 @@
             const result = await runOnce(payload);
             iteration += 1;
             iterationsEl.textContent = iteration;
-            lastAssistantText = result && result.assistant_text ? result.assistant_text : '';
             const routePoints = updateUI(result);
             showError('');
             if (!running) return;
@@ -2006,6 +2159,7 @@
             showError(error.message || 'Unknown error while calling the hop endpoint.');
             startBtn.disabled = false;
             stopBtn.disabled = true;
+            setSeedEditable(true);
             running = false;
           }
         }
@@ -2036,6 +2190,8 @@
           stopBtn.disabled = false;
           showError('');
           setStatus('booting');
+          setSeedEditable(false);
+          updateHopTable([]);
           if (mapState.animationFrame) {
             cancelAnimationFrame(mapState.animationFrame);
             mapState.animationFrame = null;
@@ -2049,6 +2205,7 @@
           startBtn.disabled = false;
           stopBtn.disabled = true;
           setStatus('stopped');
+          setSeedEditable(true);
           if (mapState.animationFrame) {
             cancelAnimationFrame(mapState.animationFrame);
             mapState.animationFrame = null;
