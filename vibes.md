@@ -63,6 +63,8 @@ Legacy Cloudflare Worker prototype retained for historical reference. No longer 
 
 ## 🛠 Implementation Log
 
+- **2025-03-11** – Added a synthetic timing fallback for the Highcharts globe so the "Your Issues" orb still glides hop to hop
+  even when the Azure hop log ships timestamps that collapse to zero, guaranteeing a visible animation on every lap.
 - **2025-03-10** – Locked the relay map orb to a persistent Highcharts marker (no more disappearing "Your Issues" glow), wired
   every animation update to track the last known coordinates, and removed the outdated notice about the public entry hop above
   the Start Muttring controls.

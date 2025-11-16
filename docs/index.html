@@ -1458,6 +1458,8 @@
           return { hop, lat: detail.lat, lng: detail.lng };
         }).filter(Boolean);
 
+        const FALLBACK_SEGMENT_DURATION_MS = 850;
+
         let defaultRouteGeometryCache = null;
 
         function getDefaultRouteGeometry() {
@@ -1697,6 +1699,59 @@
           return coordinates;
         }
 
+        function buildTimestampTimeline(points) {
+          if (!Array.isArray(points) || points.length === 0) {
+            return [];
+          }
+          return points
+            .filter((point) => Number.isFinite(point.timestampMs))
+            .sort((a, b) => a.timestampMs - b.timestampMs);
+        }
+
+        function buildFallbackTimeline(points) {
+          if (!Array.isArray(points) || points.length === 0) {
+            return [];
+          }
+          const ordered = [];
+          points.forEach((point) => {
+            if (!point) return;
+            const lat = typeof point.lat === 'number' ? point.lat : null;
+            const lng =
+              typeof point.lng === 'number'
+                ? point.lng
+                : typeof point.lon === 'number'
+                ? point.lon
+                : null;
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+              return;
+            }
+            const previous = ordered[ordered.length - 1];
+            if (
+              previous &&
+              Math.abs(previous.lat - lat) < 1e-6 &&
+              Math.abs(previous.lng - lng) < 1e-6
+            ) {
+              return;
+            }
+            ordered.push({
+              hop: typeof point.hop === 'string' ? point.hop : '',
+              direction: typeof point.direction === 'string' ? point.direction : '',
+              lat,
+              lng,
+              label: typeof point.label === 'string' ? point.label : ''
+            });
+          });
+
+          if (ordered.length < 2) {
+            return [];
+          }
+
+          return ordered.map((entry, index) => ({
+            ...entry,
+            timestampMs: index * FALLBACK_SEGMENT_DURATION_MS
+          }));
+        }
+
         function normalizeHopLogEntry(entry) {
           if (!entry || typeof entry !== 'object') {
             return null;
@@ -1909,9 +1964,10 @@
             return;
           }
 
-          const timeline = routePoints
-            .filter((point) => Number.isFinite(point.timestampMs))
-            .sort((a, b) => a.timestampMs - b.timestampMs);
+          let timeline = buildTimestampTimeline(routePoints);
+          if (timeline.length < 2) {
+            timeline = buildFallbackTimeline(routePoints);
+          }
 
           if (timeline.length < 2) {
             const finalPoint = timeline[0] || routePoints[routePoints.length - 1] || null;
@@ -1929,7 +1985,15 @@
             return;
           }
 
-          const { segments, totalDuration } = buildAnimationSegmentsFromTimeline(timeline);
+          let { segments, totalDuration } = buildAnimationSegmentsFromTimeline(timeline);
+
+          if (segments.length === 0 || totalDuration <= 0) {
+            const fallbackTimeline = buildFallbackTimeline(routePoints);
+            if (fallbackTimeline.length >= 2) {
+              timeline = fallbackTimeline;
+              ({ segments, totalDuration } = buildAnimationSegmentsFromTimeline(timeline));
+            }
+          }
 
           if (segments.length === 0 || totalDuration <= 0) {
             const finalPoint = timeline[timeline.length - 1];
