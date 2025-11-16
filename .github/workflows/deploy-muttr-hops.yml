@@ -112,6 +112,14 @@ jobs:
               --setting-names OPENROUTER_API_KEY OPENROUTER_MODEL >/dev/null 2>&1 || true
           fi
 
+      - name: Configure transcription settings
+        run: |
+          az functionapp config appsettings set \
+            --subscription "$AZURE_SUBSCRIPTION_ID" \
+            -g "$AZURE_RESOURCE_GROUP" \
+            -n "$APP_NAME" \
+            --settings TRANSCRIBE_OPENROUTER_API_KEY="${{ secrets.OPENROUTER_API_KEY }}" TRANSCRIBE_OPENROUTER_MODEL="google/gemini-2.0-flash-lite-001"
+
       - name: Configure CORS
         run: |
           REQUIRED_ORIGINS=(
@@ -141,116 +149,6 @@ jobs:
         with:
           app-name: ${{ env.APP_NAME }}
           package: ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
-
-  deploy-transcribe-us-east:
-    needs: deploy-us-east
-    runs-on: ubuntu-latest
-    env:
-      APP_NAME: muttr-transcribe-us-east
-      REGION: eastus
-      TRANSCRIBE_PACKAGE_PATH: TranscribeAudioPackage
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Azure login
-        uses: azure/login@v1
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      - name: Select subscription
-        run: az account set --subscription "$AZURE_SUBSCRIPTION_ID"
-
-      - name: Ensure resource group exists
-        run: |
-          az group create \
-            --name "$AZURE_RESOURCE_GROUP" \
-            --location "$AZURE_RESOURCE_GROUP_LOCATION" \
-            --subscription "$AZURE_SUBSCRIPTION_ID"
-
-      - name: Ensure storage account exists
-        run: |
-          if ! az storage account show \
-            --subscription "$AZURE_SUBSCRIPTION_ID" \
-            -n "$AZURE_STORAGE_ACCOUNT" \
-            -g "$AZURE_RESOURCE_GROUP" >/dev/null 2>&1; then
-            az storage account create \
-              --subscription "$AZURE_SUBSCRIPTION_ID" \
-              -n "$AZURE_STORAGE_ACCOUNT" \
-              -g "$AZURE_RESOURCE_GROUP" \
-              -l "$AZURE_RESOURCE_GROUP_LOCATION" \
-              --sku Standard_LRS \
-              --kind StorageV2
-          fi
-
-      - name: Ensure transcription function app exists
-        run: |
-          if ! az functionapp show \
-            --subscription "$AZURE_SUBSCRIPTION_ID" \
-            -g "$AZURE_RESOURCE_GROUP" \
-            -n "$APP_NAME" >/dev/null 2>&1; then
-            az functionapp create \
-              --name "$APP_NAME" \
-              --resource-group "$AZURE_RESOURCE_GROUP" \
-              --storage-account "$AZURE_STORAGE_ACCOUNT" \
-              --consumption-plan-location "$REGION" \
-              --runtime node \
-              --runtime-version ${{ env.AZURE_NODE_VERSION }} \
-              --functions-version 4 \
-              --os-type Linux \
-              --subscription "$AZURE_SUBSCRIPTION_ID"
-          fi
-
-      - name: Configure transcription settings
-        run: |
-          az functionapp config appsettings set \
-            --subscription "$AZURE_SUBSCRIPTION_ID" \
-            -g "$AZURE_RESOURCE_GROUP" \
-            -n "$APP_NAME" \
-            --settings OPENROUTER_API_KEY="${{ secrets.OPENROUTER_API_KEY }}" TRANSCRIBE_OPENROUTER_MODEL="google/gemini-2.0-flash-lite-001"
-
-      - name: Configure transcription CORS
-        run: |
-          REQUIRED_ORIGINS=(
-            "https://gregwdata.github.io"
-            "https://muttr.materialmachinelearn.ing"
-          )
-
-          EXISTING_ORIGINS=$(az functionapp cors show \
-            --subscription "$AZURE_SUBSCRIPTION_ID" \
-            --resource-group "$AZURE_RESOURCE_GROUP" \
-            --name "$APP_NAME" \
-            --query "allowedOrigins" \
-            -o tsv || true)
-
-          for ORIGIN in "${REQUIRED_ORIGINS[@]}"; do
-            if ! printf '%s\n' "$EXISTING_ORIGINS" | grep -Fxq "$ORIGIN"; then
-              az functionapp cors add \
-                --subscription "$AZURE_SUBSCRIPTION_ID" \
-                --resource-group "$AZURE_RESOURCE_GROUP" \
-                --name "$APP_NAME" \
-                --allowed-origins "$ORIGIN"
-            fi
-          done
-
-      - name: Prepare transcription package
-        run: |
-          rm -rf "$TRANSCRIBE_PACKAGE_PATH"
-          mkdir -p "$TRANSCRIBE_PACKAGE_PATH"
-          cp host.json "$TRANSCRIBE_PACKAGE_PATH"/
-          cp -R TranscribeAudio "$TRANSCRIBE_PACKAGE_PATH"/
-
-      - name: Deploy transcription function
-        uses: Azure/functions-action@v1
-        with:
-          app-name: ${{ env.APP_NAME }}
-          package: ${{ env.TRANSCRIBE_PACKAGE_PATH }}
 
   deploy-remaining:
     needs: deploy-us-east
