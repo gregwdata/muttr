@@ -1206,7 +1206,7 @@
 
             <section class="relay-app__panel">
               <h2>Global hop map</h2>
-              <p class="dev-note">Each leg renders using the latest round trip timestamps. Watch the orb trace the last lap in real time.</p>
+              <p class="dev-note">Each leg renders using the latest round trip timestamps. Watch Your Issues trace the last lap in real time.</p>
               <div id="relay-map" role="img" aria-label="World map showing the muttr hop path"></div>
             </section>
 
@@ -1312,6 +1312,36 @@
           'muttr-sydney': { label: 'Australia · Sydney', lat: -33.8688, lng: 151.2093 }
         };
 
+        const ORB_LABEL_PLAIN = 'Your\nIssues';
+        const ORB_LABEL_HTML = 'Your<br/>Issues';
+
+        const DEFAULT_ROUTE_SEQUENCE = [
+          'muttr-us-east',
+          'muttr-brazil',
+          'muttr-uk',
+          'muttr-singapore',
+          'muttr-sydney',
+          'muttr-singapore',
+          'muttr-uk',
+          'muttr-brazil',
+          'muttr-us-east'
+        ];
+
+        const DEFAULT_ROUTE_POINTS = DEFAULT_ROUTE_SEQUENCE.map((hop) => {
+          const detail = HOP_COORDINATES[hop];
+          if (!detail) return null;
+          return { hop, lat: detail.lat, lng: detail.lng };
+        }).filter(Boolean);
+
+        let defaultRouteGeometryCache = null;
+
+        function getDefaultRouteGeometry() {
+          if (!defaultRouteGeometryCache) {
+            defaultRouteGeometryCache = buildRouteGeometry(DEFAULT_ROUTE_POINTS);
+          }
+          return defaultRouteGeometryCache;
+        }
+
         const mapState = {
           chart: null,
           readyPromise: null,
@@ -1387,7 +1417,7 @@
                     useHTML: true,
                     formatter: function tooltipFormatter() {
                       if (this.series && this.series.userOptions && this.series.userOptions.id === 'orb-series') {
-                        return '<strong>Relay orb</strong><br/>Currently in-flight';
+                        return `<strong>${ORB_LABEL_HTML}</strong><br/>Currently in-flight`;
                       }
                       if (this.point && this.point.name) {
                         return `<strong>${this.point.name}</strong>`;
@@ -1416,7 +1446,7 @@
                     {
                       type: 'mapline',
                       id: 'route-series',
-                      data: [],
+                      data: getDefaultRouteGeometry(),
                       lineWidth: 1.5,
                       color: '#facc15',
                       dashStyle: 'ShortDash',
@@ -1425,13 +1455,13 @@
                     {
                       type: 'mappoint',
                       id: 'orb-series',
-                      name: 'Orb',
+                      name: ORB_LABEL_PLAIN,
                       data:
                         defaultHop
                           ? [
                               {
                                 id: 'orb-point',
-                                name: 'Orb',
+                                name: ORB_LABEL_PLAIN,
                                 lat: defaultHop.lat,
                                 lon: defaultHop.lng
                               }
@@ -1509,7 +1539,9 @@
         function updateRouteSeries(chart, points) {
           const routeSeries = chart.get('route-series');
           if (!routeSeries) return;
-          routeSeries.setData(buildRouteGeometry(points), false);
+          const hasRoute = Array.isArray(points) && points.length >= 2;
+          const data = hasRoute ? buildRouteGeometry(points) : getDefaultRouteGeometry();
+          routeSeries.setData(data, false);
         }
 
         function buildRouteGeometry(points) {
@@ -1641,7 +1673,7 @@
             [
               {
                 id: 'orb-point',
-                name: 'Orb',
+                name: ORB_LABEL_PLAIN,
                 lat: start.lat,
                 lon: start.lng
               }
@@ -1665,6 +1697,35 @@
               orbSeries.setData([], true);
             }
           });
+        }
+
+        function buildAnimationSegmentsFromTimeline(timeline) {
+          const segments = [];
+          let totalDuration = 0;
+          if (!Array.isArray(timeline) || timeline.length < 2) {
+            return { segments, totalDuration };
+          }
+          for (let i = 1; i < timeline.length; i += 1) {
+            const prev = timeline[i - 1];
+            const current = timeline[i];
+            if (!prev || !current) continue;
+            const from = { lat: prev.lat, lon: prev.lng };
+            const to = { lat: current.lat, lon: current.lng };
+            if (!Number.isFinite(from.lat) || !Number.isFinite(from.lon)) continue;
+            if (!Number.isFinite(to.lat) || !Number.isFinite(to.lon)) continue;
+            const rawDuration = Number(current.timestamp) - Number(prev.timestamp);
+            const duration = Number.isFinite(rawDuration) ? Math.max(1, rawDuration) : 1;
+            const segment = {
+              from,
+              to,
+              start: totalDuration,
+              duration,
+              end: totalDuration + duration
+            };
+            segments.push(segment);
+            totalDuration += duration;
+          }
+          return { segments, totalDuration };
         }
 
         function startOrbAnimation(routePoints) {
@@ -1697,23 +1758,19 @@
             return;
           }
 
-          const segments = [];
-          let totalDuration = 0;
-          for (let i = 1; i < timeline.length; i += 1) {
-            const prev = timeline[i - 1];
-            const current = timeline[i];
-            const duration = Math.max(current.timestamp - prev.timestamp, 1);
-            segments.push({
-              from: { lat: prev.lat, lon: prev.lng },
-              to: { lat: current.lat, lon: current.lng },
-              start: totalDuration,
-              duration,
-              end: totalDuration + duration
-            });
-            totalDuration += duration;
-          }
+          const { segments, totalDuration } = buildAnimationSegmentsFromTimeline(timeline);
 
-          if (segments.length === 0) {
+          if (segments.length === 0 || totalDuration <= 0) {
+            const finalPoint = timeline[timeline.length - 1];
+            if (finalPoint) {
+              void initMap().then((chart) => {
+                if (!chart) return;
+                const orbPoint = getOrbPoint(chart, finalPoint);
+                if (orbPoint) {
+                  orbPoint.update({ lat: finalPoint.lat, lon: finalPoint.lng }, true, false);
+                }
+              });
+            }
             return;
           }
 
