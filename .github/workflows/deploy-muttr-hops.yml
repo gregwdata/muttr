@@ -7,7 +7,6 @@ on:
       - 'MuttrHop/**'
       - 'TranscribeAudio/**'
       - 'host.json'
-      - 'docs/index.html'
       - '.github/workflows/deploy-muttr-hops.yml'
   workflow_dispatch:
 
