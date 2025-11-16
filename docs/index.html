@@ -1291,9 +1291,9 @@
                   <table class="hop-table">
                     <thead>
                       <tr>
-                        <th scope="col">Hop</th>
+                        <th scope="col">Relay Station</th>
                         <th scope="col">Direction</th>
-                        <th scope="col">Delay</th>
+                        <th scope="col">Duration</th>
                         <th scope="col">Timestamp</th>
                       </tr>
                     </thead>
@@ -1390,6 +1390,9 @@
         const mapEl = relayApp.querySelector('#relay-map');
         const relaySection = document.getElementById('relay-app');
         const relayMessageButtons = document.querySelectorAll('[data-relay-message]');
+        const hopTableHistory = [];
+        const hopTableKeySet = new Set();
+        const HOP_TABLE_HISTORY_LIMIT = 200;
 
         relayMessageButtons.forEach((cta) => {
           cta.addEventListener('click', (event) => {
@@ -1420,6 +1423,17 @@
           'muttr-singapore': { label: 'Singapore', lat: 1.3521, lng: 103.8198 },
           'muttr-sydney': { label: 'Australia · Sydney', lat: -33.8688, lng: 151.2093 }
         };
+
+        function sanitizeHopKey(value) {
+          if (typeof value !== 'string') {
+            return '';
+          }
+          const trimmed = value.trim();
+          if (!trimmed) {
+            return '';
+          }
+          return trimmed.replace(/-hop$/, '');
+        }
 
         const ORB_LABEL_PLAIN = 'Your\nIssues';
         const ORB_LABEL_HTML = 'Your<br/>Issues';
@@ -1686,16 +1700,24 @@
           if (!entry || typeof entry !== 'object') {
             return null;
           }
-          const hop = typeof entry.hop === 'string' ? entry.hop.trim() : '';
+          const hop = sanitizeHopKey(typeof entry.hop === 'string' ? entry.hop : '');
           if (!hop || !HOP_COORDINATES[hop]) {
             return null;
           }
           const detail = HOP_COORDINATES[hop];
-          const timestampMs = Date.parse(entry.timestamp);
+          let timestampMs = null;
+          if (typeof entry.timestamp_ms === 'number' && Number.isFinite(entry.timestamp_ms)) {
+            timestampMs = entry.timestamp_ms;
+          } else if (typeof entry.timestamp === 'number' && Number.isFinite(entry.timestamp)) {
+            timestampMs = entry.timestamp;
+          } else if (typeof entry.timestamp === 'string') {
+            const parsed = Date.parse(entry.timestamp);
+            timestampMs = Number.isNaN(parsed) ? null : parsed;
+          }
           return {
             hop,
             direction: typeof entry.direction === 'string' ? entry.direction : '',
-            timestamp: Number.isNaN(timestampMs) ? null : timestampMs,
+            timestampMs: Number.isFinite(timestampMs) ? timestampMs : null,
             lat: detail.lat,
             lng: detail.lng,
             label: detail.label
@@ -1822,8 +1844,8 @@
             const to = { lat: current.lat, lon: current.lng };
             if (!Number.isFinite(from.lat) || !Number.isFinite(from.lon)) continue;
             if (!Number.isFinite(to.lat) || !Number.isFinite(to.lon)) continue;
-            const rawDuration = Number(current.timestamp) - Number(prev.timestamp);
-            const duration = Number.isFinite(rawDuration) ? Math.max(1, rawDuration) : 1;
+            const rawDuration = Number(current.timestampMs) - Number(prev.timestampMs);
+            const duration = Number.isFinite(rawDuration) ? Math.max(0, rawDuration) : 0;
             const segment = {
               from,
               to,
@@ -1848,8 +1870,8 @@
           }
 
           const timeline = routePoints
-            .filter((point) => Number.isFinite(point.timestamp))
-            .sort((a, b) => a.timestamp - b.timestamp);
+            .filter((point) => Number.isFinite(point.timestampMs))
+            .sort((a, b) => a.timestampMs - b.timestampMs);
 
           if (timeline.length < 2) {
             const finalPoint = timeline[0] || routePoints[routePoints.length - 1] || null;
@@ -1956,6 +1978,7 @@
         }
 
         setSeedEditable(true);
+        renderHopTable();
 
         function queueUpdate(text) {
           const trimmed = typeof text === 'string' ? text.trim() : '';
@@ -1984,25 +2007,152 @@
           }
         }
 
-        function formatDelay(entry) {
-          const delay =
-            typeof entry.delay_ms === 'number'
-              ? entry.delay_ms
-              : typeof entry.duration_ms === 'number'
-              ? entry.duration_ms
-              : null;
-          if (delay === null) {
+        const durationNumberFormatter = new Intl.NumberFormat(undefined, {
+          maximumFractionDigits: 0
+        });
+
+        function formatDuration(durationMs) {
+          if (!Number.isFinite(durationMs)) {
             return '—';
           }
-          if (delay >= 1000) {
-            return `${(delay / 1000).toFixed(2)} s`;
+          return `${durationNumberFormatter.format(Math.round(durationMs))} ms`;
+        }
+
+        function deriveDurationMs(entry, prevEntry) {
+          if (entry && typeof entry.duration_ms === 'number') {
+            return entry.duration_ms;
           }
-          return `${Math.round(delay)} ms`;
+          if (entry && typeof entry.delay_ms === 'number' && entry.delay_ms > 0) {
+            return entry.delay_ms;
+          }
+          const currentTimestamp =
+            entry && typeof entry.timestamp_ms === 'number'
+              ? entry.timestamp_ms
+              : entry && typeof entry.timestamp === 'number'
+              ? entry.timestamp
+              : entry && typeof entry.timestamp === 'string'
+              ? Date.parse(entry.timestamp)
+              : NaN;
+          const prevTimestamp =
+            prevEntry && typeof prevEntry.timestamp_ms === 'number'
+              ? prevEntry.timestamp_ms
+              : prevEntry && typeof prevEntry.timestamp === 'number'
+              ? prevEntry.timestamp
+              : prevEntry && typeof prevEntry.timestamp === 'string'
+              ? Date.parse(prevEntry.timestamp)
+              : NaN;
+          if (!Number.isFinite(currentTimestamp) || !Number.isFinite(prevTimestamp)) {
+            return null;
+          }
+          const delta = currentTimestamp - prevTimestamp;
+          return Number.isFinite(delta) && delta >= 0 ? delta : null;
+        }
+
+        function buildHopTableKey(entry) {
+          if (!entry || typeof entry !== 'object') {
+            return null;
+          }
+          const hopValue = typeof entry.hop === 'string' ? entry.hop : '';
+          const directionValue = typeof entry.direction === 'string' ? entry.direction : '';
+          const pathValue = typeof entry.path === 'string' ? entry.path : '';
+          const timestampValue =
+            typeof entry.timestamp === 'string'
+              ? entry.timestamp
+              : typeof entry.timestamp === 'number'
+              ? entry.timestamp
+              : typeof entry.timestamp_ms === 'number'
+              ? entry.timestamp_ms
+              : '';
+          return [hopValue, directionValue, pathValue, timestampValue].join('|');
+        }
+
+        function renderHopTable() {
+          if (!hopTableBody) return;
+          hopTableBody.innerHTML = '';
+          if (hopTableHistory.length === 0) {
+            const emptyRow = document.createElement('tr');
+            const cell = document.createElement('td');
+            cell.colSpan = 4;
+            cell.textContent = 'Awaiting the first hop.';
+            emptyRow.appendChild(cell);
+            hopTableBody.appendChild(emptyRow);
+            return;
+          }
+
+          hopTableHistory.forEach((entry) => {
+            const row = document.createElement('tr');
+
+            const hopCell = document.createElement('td');
+            hopCell.textContent = describeHop(entry);
+            row.appendChild(hopCell);
+
+            const directionCell = document.createElement('td');
+            directionCell.textContent = entry && entry.direction ? entry.direction : '—';
+            row.appendChild(directionCell);
+
+            const durationCell = document.createElement('td');
+            const durationValue = entry && typeof entry.duration_ms === 'number' ? entry.duration_ms : null;
+            durationCell.textContent = formatDuration(durationValue);
+            row.appendChild(durationCell);
+
+            const timestampCell = document.createElement('td');
+            const timestampValue =
+              entry && Object.prototype.hasOwnProperty.call(entry, 'timestamp')
+                ? entry.timestamp
+                : entry && typeof entry.timestamp_ms === 'number'
+                ? entry.timestamp_ms
+                : null;
+            timestampCell.textContent = formatTimestamp(timestampValue);
+            row.appendChild(timestampCell);
+
+            hopTableBody.appendChild(row);
+          });
+        }
+
+        function appendHopTableEntries(entries) {
+          if (!Array.isArray(entries) || entries.length === 0) {
+            renderHopTable();
+            return;
+          }
+
+          entries.forEach((entry, index) => {
+            const key = buildHopTableKey(entry);
+            if (!key || hopTableKeySet.has(key)) {
+              return;
+            }
+            const prevEntry = index > 0 ? entries[index - 1] : null;
+            const derivedDuration = deriveDurationMs(entry, prevEntry);
+            const storedEntry = {
+              ...entry,
+              duration_ms: Number.isFinite(derivedDuration) ? derivedDuration : null,
+              hopTableKey: key
+            };
+            hopTableHistory.unshift(storedEntry);
+            hopTableKeySet.add(key);
+          });
+
+          while (hopTableHistory.length > HOP_TABLE_HISTORY_LIMIT) {
+            const removed = hopTableHistory.pop();
+            if (removed && removed.hopTableKey) {
+              hopTableKeySet.delete(removed.hopTableKey);
+            }
+          }
+
+          renderHopTable();
+        }
+
+        function resetHopTableHistory() {
+          hopTableHistory.length = 0;
+          hopTableKeySet.clear();
+          renderHopTable();
         }
 
         function formatTimestamp(value) {
-          if (!value) return '—';
-          const ms = Date.parse(value);
+          if (value === null || value === undefined) return '—';
+          const ms =
+            typeof value === 'number' && Number.isFinite(value)
+              ? value
+              : Date.parse(value);
           if (Number.isNaN(ms)) {
             return '—';
           }
@@ -2020,10 +2170,10 @@
           if (!entry) {
             return '—';
           }
-          const hopKey = typeof entry.hop === 'string' ? entry.hop : '';
+          const hopKey = sanitizeHopKey(typeof entry.hop === 'string' ? entry.hop : '');
           const detail = hopKey ? HOP_COORDINATES[hopKey] : null;
           if (detail) {
-            return `${detail.label} (${hopKey})`;
+            return detail.label;
           }
           if (hopKey) {
             return hopKey;
@@ -2035,40 +2185,7 @@
         }
 
         function updateHopTable(entries) {
-          if (!hopTableBody) return;
-          hopTableBody.innerHTML = '';
-          if (!Array.isArray(entries) || entries.length === 0) {
-            const emptyRow = document.createElement('tr');
-            const cell = document.createElement('td');
-            cell.colSpan = 4;
-            cell.textContent = 'Awaiting the first hop.';
-            emptyRow.appendChild(cell);
-            hopTableBody.appendChild(emptyRow);
-            return;
-          }
-
-          const ordered = entries.slice().reverse();
-          ordered.forEach((entry) => {
-            const row = document.createElement('tr');
-
-            const hopCell = document.createElement('td');
-            hopCell.textContent = describeHop(entry);
-            row.appendChild(hopCell);
-
-            const directionCell = document.createElement('td');
-            directionCell.textContent = entry && entry.direction ? entry.direction : '—';
-            row.appendChild(directionCell);
-
-            const delayCell = document.createElement('td');
-            delayCell.textContent = formatDelay(entry);
-            row.appendChild(delayCell);
-
-            const timestampCell = document.createElement('td');
-            timestampCell.textContent = formatTimestamp(entry && entry.timestamp ? entry.timestamp : null);
-            row.appendChild(timestampCell);
-
-            hopTableBody.appendChild(row);
-          });
+          appendHopTableEntries(entries);
         }
 
         function updateUI(result) {
@@ -2191,7 +2308,7 @@
           showError('');
           setStatus('booting');
           setSeedEditable(false);
-          updateHopTable([]);
+          resetHopTableHistory();
           if (mapState.animationFrame) {
             cancelAnimationFrame(mapState.animationFrame);
             mapState.animationFrame = null;

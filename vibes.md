@@ -63,6 +63,7 @@ Legacy Cloudflare Worker prototype retained for historical reference. No longer 
 
 ## 🛠 Implementation Log
 
+- **2025-03-09** – Fixed the relay manifest to accumulate reverse-chronological rows with raw millisecond durations, renamed the column to “Relay Station,” and repaired the Highcharts orb animation by sanitizing hop names and replaying hop-to-hop deltas using exact timestamp differences (no artificial minimums).
 - **2025-03-07** – Reworked the live relay UX so the seed textarea becomes the assistant output while runs are active, locks itself during loops, adds a renamed "Watch AI haul your burdens" map alongside it, introduces a full-width live hop manifest table, and softens the suggestion buttons.
 - **2025-11-16** – Simplified the live relay header, retitled the CTAs to “Launch muttr,” wired pricing/deck buttons to auto-scroll into the relay with prefilled anti-sales-call gripes, and retitled the control button to “Start Muttring.”
 - **2025-03-06** – Rebuilt the relay map animation so “Your Issues” glides along great-circle routes using actual hop-to-hop timing deltas, restored the dotted baseline route, and renamed the orb to match the new label.
