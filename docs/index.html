@@ -1265,9 +1265,6 @@
               <p class="dev-note" id="relay-update-note">
                 Submitted updates are queued and will join the next hop in the circuit.
               </p>
-              <p class="notice">
-                The loop always launches through the public muttr entry hop. Bring your own client if you need a private circuit.
-              </p>
               <p id="relay-error" class="error-message" hidden></p>
               <div class="controls">
                 <button id="relay-start">Start Muttring</button>
@@ -1424,6 +1421,11 @@
           'muttr-sydney': { label: 'Australia · Sydney', lat: -33.8688, lng: 151.2093 }
         };
 
+        const DEFAULT_ORB_POSITION = HOP_COORDINATES['muttr-us-east'];
+        let lastKnownOrbPosition = DEFAULT_ORB_POSITION
+          ? { lat: DEFAULT_ORB_POSITION.lat, lon: DEFAULT_ORB_POSITION.lng }
+          : null;
+
         function sanitizeHopKey(value) {
           if (typeof value !== 'string') {
             return '';
@@ -1500,7 +1502,6 @@
                   return null;
                 }
 
-                const defaultHop = HOP_COORDINATES['muttr-us-east'];
                 const hopData = buildHopSeriesData(new Set());
 
                 mapState.chart = Highcharts.mapChart(mapEl, {
@@ -1580,13 +1581,13 @@
                       id: 'orb-series',
                       name: ORB_LABEL_PLAIN,
                       data:
-                        defaultHop
+                        DEFAULT_ORB_POSITION
                           ? [
                               {
                                 id: 'orb-point',
                                 name: ORB_LABEL_PLAIN,
-                                lat: defaultHop.lat,
-                                lon: defaultHop.lng
+                                lat: DEFAULT_ORB_POSITION.lat,
+                                lon: DEFAULT_ORB_POSITION.lng
                               }
                             ]
                           : [],
@@ -1798,21 +1799,52 @@
           }
           const orbSeries = chart.get('orb-series');
           if (!orbSeries) return null;
-          const start = fallbackPoint || HOP_COORDINATES['muttr-us-east'];
+          const start = fallbackPoint || DEFAULT_ORB_POSITION;
           if (!start) return null;
+          const lonValue =
+            typeof start.lon === 'number'
+              ? start.lon
+              : typeof start.lng === 'number'
+              ? start.lng
+              : null;
+          if (!Number.isFinite(start.lat) || !Number.isFinite(lonValue)) {
+            return null;
+          }
           orbSeries.setData(
             [
               {
                 id: 'orb-point',
                 name: ORB_LABEL_PLAIN,
                 lat: start.lat,
-                lon: start.lng
+                lon: lonValue
               }
             ],
             false
           );
           chart.redraw();
-          return chart.get('orb-point');
+          orbPoint = chart.get('orb-point');
+          if (orbPoint) {
+            lastKnownOrbPosition = { lat: start.lat, lon: lonValue };
+          }
+          return orbPoint;
+        }
+
+        function applyOrbPosition(orbPoint, position) {
+          if (!orbPoint || !position) {
+            return;
+          }
+          const lat = typeof position.lat === 'number' ? position.lat : null;
+          const lon =
+            typeof position.lon === 'number'
+              ? position.lon
+              : typeof position.lng === 'number'
+              ? position.lng
+              : null;
+          if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+            return;
+          }
+          orbPoint.update({ lat, lon }, true, false);
+          lastKnownOrbPosition = { lat, lon };
         }
 
         function hideOrbMarker() {
@@ -1821,11 +1853,19 @@
             cancelAnimationFrame(mapState.animationFrame);
             mapState.animationFrame = null;
           }
+          const fallback =
+            lastKnownOrbPosition ||
+            (DEFAULT_ORB_POSITION
+              ? { lat: DEFAULT_ORB_POSITION.lat, lon: DEFAULT_ORB_POSITION.lng }
+              : null);
+          if (!fallback) {
+            return;
+          }
           void initMap().then((chart) => {
             if (!chart) return;
-            const orbSeries = chart.get('orb-series');
-            if (orbSeries) {
-              orbSeries.setData([], true);
+            const orbPoint = getOrbPoint(chart, fallback);
+            if (orbPoint) {
+              applyOrbPosition(orbPoint, fallback);
             }
           });
         }
@@ -1880,7 +1920,7 @@
                 if (!chart) return;
                 const orbPoint = getOrbPoint(chart, finalPoint);
                 if (orbPoint) {
-                  orbPoint.update({ lat: finalPoint.lat, lon: finalPoint.lng }, true, false);
+                  applyOrbPosition(orbPoint, finalPoint);
                 }
               });
             } else {
@@ -1898,7 +1938,7 @@
                 if (!chart) return;
                 const orbPoint = getOrbPoint(chart, finalPoint);
                 if (orbPoint) {
-                  orbPoint.update({ lat: finalPoint.lat, lon: finalPoint.lng }, true, false);
+                  applyOrbPosition(orbPoint, finalPoint);
                 }
               });
             }
@@ -1917,7 +1957,7 @@
               return;
             }
 
-            orbPoint.update({ lat: timeline[0].lat, lon: timeline[0].lng }, true, false);
+            applyOrbPosition(orbPoint, timeline[0]);
             const animationStart = performance.now();
 
             const step = (timestamp) => {
@@ -1928,7 +1968,7 @@
               const elapsed = timestamp - animationStart;
               if (elapsed >= totalDuration) {
                 const finalSegment = segments[segments.length - 1];
-                orbPoint.update({ lat: finalSegment.to.lat, lon: finalSegment.to.lon }, true, false);
+                applyOrbPosition(orbPoint, finalSegment.to);
                 mapState.animationFrame = null;
                 return;
               }
@@ -1937,7 +1977,7 @@
               const localTime = Math.max(0, Math.min(current.duration, elapsed - current.start));
               const progress = current.duration === 0 ? 1 : localTime / current.duration;
               const position = interpolateGreatCircle(current.from, current.to, progress);
-              orbPoint.update({ lat: position.lat, lon: position.lon }, true, false);
+              applyOrbPosition(orbPoint, position);
               mapState.animationFrame = requestAnimationFrame(step);
             };
 
