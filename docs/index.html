@@ -1222,11 +1222,6 @@
       </section>
 
       <section class="section relay-section" id="relay-app">
-        <h2>Launch the live relay below the landing page.</h2>
-        <p class="lead">
-          This is the original muttr interface—fully operational, Leaflet globe and all—ready to send your todo list on its
-          world tour without leaving this page.
-        </p>
         <div class="relay-app" id="relay-app-module">
           <header class="relay-app__header">
             <h3>muttr</h3>
@@ -1397,7 +1392,11 @@
             if (event) {
               event.preventDefault();
             }
-            if (message && updateInput) {
+            if (message && seed) {
+              seed.value = message;
+              seed.dispatchEvent(new Event('input', { bubbles: true }));
+              seed.focus();
+            } else if (message && updateInput) {
               updateInput.value = message;
               updateInput.dispatchEvent(new Event('input', { bubbles: true }));
               updateInput.focus();
