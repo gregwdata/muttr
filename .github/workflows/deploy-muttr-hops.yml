@@ -216,6 +216,30 @@ jobs:
             -n "$APP_NAME" \
             --settings OPENROUTER_API_KEY="${{ secrets.OPENROUTER_API_KEY }}" TRANSCRIBE_OPENROUTER_MODEL="google/gemini-2.0-flash-lite-001"
 
+      - name: Configure transcription CORS
+        run: |
+          REQUIRED_ORIGINS=(
+            "https://gregwdata.github.io"
+            "https://muttr.materialmachinelearn.ing"
+          )
+
+          EXISTING_ORIGINS=$(az functionapp cors show \
+            --subscription "$AZURE_SUBSCRIPTION_ID" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "$APP_NAME" \
+            --query "allowedOrigins" \
+            -o tsv || true)
+
+          for ORIGIN in "${REQUIRED_ORIGINS[@]}"; do
+            if ! printf '%s\n' "$EXISTING_ORIGINS" | grep -Fxq "$ORIGIN"; then
+              az functionapp cors add \
+                --subscription "$AZURE_SUBSCRIPTION_ID" \
+                --resource-group "$AZURE_RESOURCE_GROUP" \
+                --name "$APP_NAME" \
+                --allowed-origins "$ORIGIN"
+            fi
+          done
+
       - name: Prepare transcription package
         run: |
           rm -rf "$TRANSCRIBE_PACKAGE_PATH"
