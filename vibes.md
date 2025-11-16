@@ -63,6 +63,7 @@ Legacy Cloudflare Worker prototype retained for historical reference. No longer 
 
 ## 🛠 Implementation Log
 
+- **2025-03-06** – Rebuilt the relay map animation so “Your Issues” glides along great-circle routes using actual hop-to-hop timing deltas, restored the dotted baseline route, and renamed the orb to match the new label.
 - **2025-03-05** – Swapped the relay UI's Leaflet globe for a Highcharts-powered map with real-time great-circle orb animation keyed to hop timings so each lap replays with the actual per-leg durations.
 
 - **2025-03-04** – Embedded the original relay UI at the bottom of `docs/index.html`, wired the “Launch the Relay” CTAs to scroll straight to it, and restored the Leaflet-powered map plus hop loop so the marketing page still delivers the working app.
