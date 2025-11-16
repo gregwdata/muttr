@@ -69,6 +69,7 @@ Legacy Cloudflare Worker prototype retained for historical reference. No longer 
 
 ## 🛠 Implementation Log
 
+- **2025-03-19** – Floated the seed microphone button over the main textarea, taught transcripts to overwrite the default seed copy instead of appending, mirrored the recording guidance toast on the update mic, and added a transcription system prompt that returns “no audio detected” whenever silence is captured.
 - **2025-03-18** – Taught the microphone silence detector to auto-calibrate its threshold so quieter desktop mics keep recording instead of bailing out, fixing the “works on mobile, silent on PC” reports.
 
 - **2025-03-17** – Added automatic microphone silence detection so recordings stop after three seconds of quiet, wired it into the OpenRouter transcription flow, and surfaced a toast reminding people they can wait for the auto-stop or click the mic again to end capture.

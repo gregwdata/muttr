@@ -618,12 +618,6 @@
         box-shadow: 0 12px 22px rgba(249, 115, 22, 0.25);
       }
 
-      .audio-input-row {
-        display: flex;
-        justify-content: flex-end;
-        margin-bottom: 0.5rem;
-      }
-
       .label-row {
         display: flex;
         align-items: center;
@@ -633,6 +627,15 @@
 
       .label-row label {
         margin: 0;
+      }
+
+      .textarea-audio-wrapper {
+        position: relative;
+      }
+
+      .textarea-audio-wrapper textarea {
+        padding-right: 4rem;
+        padding-bottom: 3.25rem;
       }
 
       .relay-app button.audio-button {
@@ -660,6 +663,13 @@
         width: 36px;
         height: 36px;
         min-width: 36px;
+      }
+
+      .relay-app button.audio-button.audio-button--floating {
+        position: absolute;
+        right: 1.25rem;
+        bottom: 1.25rem;
+        box-shadow: 0 20px 35px rgba(15, 23, 42, 0.65);
       }
 
       .relay-app button.audio-button.is-recording {
@@ -1351,10 +1361,14 @@
           <div class="relay-app__grid">
             <section class="relay-app__panel">
               <h2>Place your concerns here</h2>
-              <div class="audio-input-row">
+              <div class="textarea-audio-wrapper">
+                <textarea id="relay-seed" placeholder="List the burdens weighing you down...">- Buy groceries
+- Eat lunch
+- Mow grass
+- Do Taxes</textarea>
                 <button
                   type="button"
-                  class="audio-button"
+                  class="audio-button audio-button--floating"
                   data-audio-target="seed"
                   title="Audio input"
                   aria-label="Capture audio for your main todo list"
@@ -1367,10 +1381,6 @@
                   <span class="sr-only">Capture audio for your main todo list</span>
                 </button>
               </div>
-              <textarea id="relay-seed" placeholder="List the burdens weighing you down...">- Buy groceries
-- Eat lunch
-- Mow grass
-- Do Taxes</textarea>
               <div class="label-row">
                 <label for="relay-update-input">Update your list</label>
                 <button
@@ -1523,6 +1533,7 @@
         if (!relayApp) return;
 
         const seed = relayApp.querySelector('#relay-seed');
+        const defaultSeedText = seed ? seed.value : '';
         const updateForm = relayApp.querySelector('#relay-update-form');
         const updateInput = relayApp.querySelector('#relay-update-input');
         const suggestionButtons = relayApp.querySelectorAll('.suggestion-button');
@@ -2587,8 +2598,8 @@
         async function sendAudioForTranscription(base64, format, target) {
           const prompt =
             target === 'update'
-              ? 'Transcribe this todo list update exactly as spoken. Return only the transcript.'
-              : 'Transcribe this todo list seed exactly as spoken, keeping its natural structure. Return only the transcript.';
+              ? 'Transcribe this todo list update exactly as spoken. Return only the transcript. If you do not hear anyone speaking, respond with "no audio detected".'
+              : 'Transcribe this todo list seed exactly as spoken, keeping its natural structure. Return only the transcript. If you do not hear anyone speaking, respond with "no audio detected".';
           const controller = new AbortController();
           const timeout = setTimeout(() => controller.abort(), 45000);
           try {
@@ -2650,8 +2661,13 @@
           }
           if (seed) {
             const existing = seed.value || '';
-            const needsBreak = existing && !existing.endsWith('\n') ? '\n' : '';
-            seed.value = existing ? `${existing}${needsBreak}${cleaned}` : cleaned;
+            const isDefaultSeed = defaultSeedText && existing === defaultSeedText;
+            if (isDefaultSeed) {
+              seed.value = cleaned;
+            } else {
+              const needsBreak = existing && !existing.endsWith('\n') ? '\n' : '';
+              seed.value = existing ? `${existing}${needsBreak}${cleaned}` : cleaned;
+            }
             seed.dispatchEvent(new Event('input', { bubbles: true }));
             seed.focus();
           }
@@ -2745,7 +2761,8 @@
             stopActiveRecording();
             return;
           }
-          showAudioGuidanceToast();
+          const target = button.dataset.audioTarget || 'seed';
+          showAudioGuidanceToast(target);
           startRecording(button);
         }
 
@@ -2846,9 +2863,10 @@
           };
         }
 
-        function showAudioGuidanceToast() {
+        function showAudioGuidanceToast(target = 'seed') {
           const quietSeconds = Math.round(AUDIO_SILENCE_DURATION_MS / 1000);
-          const message = `Audio recording will stop when you are quiet for ${quietSeconds} seconds or click the audio button again to stop recording.`;
+          const areaLabel = target === 'update' ? 'update input' : 'main list';
+          const message = `Audio recording for your ${areaLabel} will stop when you are quiet for ${quietSeconds} seconds or when you click the audio button again.`;
           showToast(message, {
             kind: 'audio-guidance',
             duration: AUDIO_GUIDANCE_TOAST_DURATION_MS,
