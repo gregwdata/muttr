@@ -63,6 +63,8 @@ Legacy Cloudflare Worker prototype retained for historical reference. No longer 
 
 ## 🛠 Implementation Log
 
+- **2025-03-13** – Pointed the marketing CTA auto-fill buttons at the main relay seed input (instead of the update field) and
+  removed the leftover "Launch the live relay" development copy from the landing page.
 - **2025-03-12** – Normalized Azure hop names so telemetry entries like `us-east-hop` automatically map onto the `muttr-us-east`
   coordinate set, restoring the relay map markers and globe animation regardless of how each Function App labels itself.
 - **2025-03-11** – Added a synthetic timing fallback for the Highcharts globe so the "Your Issues" orb still glides hop to hop
