@@ -1434,7 +1434,17 @@
           if (!trimmed) {
             return '';
           }
-          return trimmed.replace(/-hop$/, '');
+          const withoutSuffix = trimmed.replace(/-hop$/, '');
+          if (HOP_COORDINATES[withoutSuffix]) {
+            return withoutSuffix;
+          }
+          const prefixed = withoutSuffix.startsWith('muttr-')
+            ? withoutSuffix
+            : `muttr-${withoutSuffix}`;
+          if (HOP_COORDINATES[prefixed]) {
+            return prefixed;
+          }
+          return withoutSuffix;
         }
 
         const ORB_LABEL_PLAIN = 'Your\nIssues';

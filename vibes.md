@@ -63,6 +63,8 @@ Legacy Cloudflare Worker prototype retained for historical reference. No longer 
 
 ## 🛠 Implementation Log
 
+- **2025-03-12** – Normalized Azure hop names so telemetry entries like `us-east-hop` automatically map onto the `muttr-us-east`
+  coordinate set, restoring the relay map markers and globe animation regardless of how each Function App labels itself.
 - **2025-03-11** – Added a synthetic timing fallback for the Highcharts globe so the "Your Issues" orb still glides hop to hop
   even when the Azure hop log ships timestamps that collapse to zero, guaranteeing a visible animation on every lap.
 - **2025-03-10** – Locked the relay map orb to a persistent Highcharts marker (no more disappearing "Your Issues" glow), wired
