@@ -69,6 +69,9 @@ Legacy Cloudflare Worker prototype retained for historical reference. No longer 
 
 ## 🛠 Implementation Log
 
+ - **2025-03-17** – Deleted the checked-in mascot + favicon binaries (`docs/assets/muttrman.png`, `docs/assets/muttrman-pixel.png`, `docs/favicon.png`, `docs/favicon.ico`) so the repo stays text-only; remember to upload those exact files after merge so the hero and favicon render in production.
+ - **2025-03-16** – Documented where to drop the muttrman hero art plus `favicon.png`/`favicon.ico` so folks can upload the binaries manually while keeping the repo text-only (`docs/assets/muttrman.png`, `docs/favicon.png`, `docs/favicon.ico`).
+ - **2025-03-15** – Welcomed muttrman to the hero section with a masked fade treatment and added Cloudflare-friendly favicon assets derived from the pixel art mascot.
 - **2025-03-14** – Added microphone capture buttons for the seed and update inputs, wired them through a new US East `transcribe-audio` Azure Function that feeds OpenRouter’s `google/gemini-2.0-flash-lite-001`, and automatically injects the transcripts back into the appropriate fields while respecting the relay’s lock state.
 - **2025-03-13** – Pointed the marketing CTA auto-fill buttons at the main relay seed input (instead of the update field) and
   removed the leftover "Launch the live relay" development copy from the landing page.
