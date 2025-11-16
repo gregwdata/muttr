@@ -1629,6 +1629,7 @@
         const hopTableHistory = [];
         const hopTableKeySet = new Set();
         const HOP_TABLE_HISTORY_LIMIT = 200;
+        const MAX_ITERATIONS = 107;
         const audioButtons = relayApp.querySelectorAll('[data-audio-target]');
         const seedAudioButton = relayApp.querySelector('[data-audio-target="seed"]');
         const updateAudioButton = relayApp.querySelector('[data-audio-target="update"]');
@@ -3214,6 +3215,14 @@
             if (!running) return;
             setStatus('waiting');
             startOrbAnimation(routePoints);
+            if (iteration >= MAX_ITERATIONS) {
+              running = false;
+              startBtn.disabled = false;
+              stopBtn.disabled = true;
+              setStatus('complete');
+              setSeedEditable(true);
+              return;
+            }
             requestAnimationFrame(loop);
           } catch (error) {
             console.error(error);
