@@ -889,7 +889,7 @@
           <a href="#social-proof">Testimonials</a>
           <a href="#pricing">Pricing</a>
         </div>
-        <a class="pill-button" href="#relay-app">Launch the Relay</a>
+        <a class="pill-button" href="#relay-app">Launch muttr</a>
       </nav>
     </header>
     <main id="site-content">
@@ -901,8 +901,13 @@
             Your brain doesn’t need another midnight sprint. muttr offloads the inner muttering to an orbiting relay of AI confidants, sending every concern on a passport-stamped world tour so you can stay focused on the work that matters.
           </p>
           <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
-            <a class="cta-button" href="#relay-app">Launch the Relay</a>
-            <button class="pill-button secondary" type="button">Download the deck</button>
+            <a class="cta-button" href="#relay-app">Launch muttr</a>
+            <a
+              class="pill-button secondary"
+              href="#relay-app"
+              data-relay-message="Like I'm going to read another lame AI startup's pitch deck. I need to remember to jam it through Grok and get a summary."
+              >Download the deck</a
+            >
           </div>
         </div>
         <aside class="hero-card">
@@ -1100,7 +1105,12 @@
               <li>Single relay chain</li>
               <li>Weekly mutter summaries</li>
             </ul>
-            <button class="pill-button secondary" type="button" data-open-modal>Book a trial</button>
+            <a
+              class="pill-button secondary"
+              href="#relay-app"
+              data-relay-message="Ugh, another enterprise sales rep. There goes my lunch break."
+              >Book a trial</a
+            >
           </article>
           <article class="pricing-card highlight">
             <h3>Growth</h3>
@@ -1111,7 +1121,12 @@
               <li>API access to muttering transcripts</li>
               <li>Escalation routing for urgent anxieties</li>
             </ul>
-            <button class="cta-button" type="button" data-open-modal>Talk to sales</button>
+            <a
+              class="cta-button"
+              href="#relay-app"
+              data-relay-message="Can't believe I'm stuck on a discovery call instead of shipping my roadmap."
+              >Talk to sales</a
+            >
           </article>
           <article class="pricing-card">
             <h3>Enterprise</h3>
@@ -1122,7 +1137,12 @@
               <li>Private global pacing constellations</li>
               <li>Dedicated chief muttering officer</li>
             </ul>
-            <button class="pill-button secondary" type="button" data-open-modal>Schedule a briefing</button>
+            <a
+              class="pill-button secondary"
+              href="#relay-app"
+              data-relay-message="Do I really need to sit through another sales briefing before I can breathe?"
+              >Schedule a briefing</a
+            >
           </article>
         </div>
       </section>
@@ -1143,8 +1163,7 @@
         </p>
         <div class="relay-app" id="relay-app-module">
           <header class="relay-app__header">
-            <h3>muttr: the borderless todo telephone</h3>
-            <p>Everything you type goes on a global sightseeing tour through a daisy-chained LLM relay.</p>
+            <h3>muttr</h3>
           </header>
           <div class="relay-app__grid">
             <section class="relay-app__panel">
@@ -1185,7 +1204,7 @@
               </p>
               <p id="relay-error" class="error-message" hidden></p>
               <div class="controls">
-                <button id="relay-start">Start Global Loop</button>
+                <button id="relay-start">Start Muttring</button>
                 <button id="relay-stop" disabled>Stop</button>
                 <span class="badge">iteration: <span id="relay-iterations">0</span></span>
                 <span class="badge">status: <span id="relay-status">idle</span></span>
@@ -1303,6 +1322,30 @@
         const rawEl = relayApp.querySelector('#relay-raw');
         const errorEl = relayApp.querySelector('#relay-error');
         const mapEl = relayApp.querySelector('#relay-map');
+        const relaySection = document.getElementById('relay-app');
+        const relayMessageButtons = document.querySelectorAll('[data-relay-message]');
+
+        relayMessageButtons.forEach((cta) => {
+          cta.addEventListener('click', (event) => {
+            const message = cta.getAttribute('data-relay-message');
+            if (event) {
+              event.preventDefault();
+            }
+            if (message && updateInput) {
+              updateInput.value = message;
+              updateInput.dispatchEvent(new Event('input', { bubbles: true }));
+              updateInput.focus();
+            }
+            if (relaySection && relaySection.scrollIntoView) {
+              relaySection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+            if (typeof history !== 'undefined' && typeof history.replaceState === 'function') {
+              history.replaceState(null, '', '#relay-app');
+            } else if (typeof window !== 'undefined' && window.location) {
+              window.location.hash = 'relay-app';
+            }
+          });
+        });
 
         const HOP_COORDINATES = {
           'muttr-us-east': { label: 'US East · Virginia, USA', lat: 37.505, lng: -77.32 },
