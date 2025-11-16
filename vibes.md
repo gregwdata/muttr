@@ -69,9 +69,10 @@ Legacy Cloudflare Worker prototype retained for historical reference. No longer 
 
 ## 🛠 Implementation Log
 
- - **2025-03-17** – Deleted the checked-in mascot + favicon binaries (`docs/assets/muttrman.png`, `docs/assets/muttrman-pixel.png`, `docs/favicon.png`, `docs/favicon.ico`) so the repo stays text-only; remember to upload those exact files after merge so the hero and favicon render in production.
- - **2025-03-16** – Documented where to drop the muttrman hero art plus `favicon.png`/`favicon.ico` so folks can upload the binaries manually while keeping the repo text-only (`docs/assets/muttrman.png`, `docs/favicon.png`, `docs/favicon.ico`).
- - **2025-03-15** – Welcomed muttrman to the hero section with a masked fade treatment and added Cloudflare-friendly favicon assets derived from the pixel art mascot.
+- **2025-03-17** – Deleted the checked-in mascot + favicon binaries (`docs/assets/muttrman.png`, `docs/assets/muttrman-pixel.png`, `docs/favicon.png`, `docs/favicon.ico`) so the repo stays text-only; remember to upload those exact files after merge so the hero and favicon render in production.
+- **2025-03-16** – Documented where to drop the muttrman hero art plus `favicon.png`/`favicon.ico` so folks can upload the binaries manually while keeping the repo text-only (`docs/assets/muttrman.png`, `docs/favicon.png`, `docs/favicon.ico`).
+- **2025-03-15** – Welcomed muttrman to the hero section with a masked fade treatment and added Cloudflare-friendly favicon assets derived from the pixel art mascot.
+- **2025-11-16** – Wired up real Open Graph + Twitter card metadata that points at `docs/assets/muttr_social_card.png` and repeats the new "No worries, no storage, only vibes" description so shared links pull in the proper 1200×630 artwork.
 - **2025-03-20** – Collapsed the Azure deployment workflow so the US East hop also hosts the `transcribe-audio` function (and gets the OpenRouter transcription secrets) and pointed the UI at the shared endpoint.
 
 - **2025-03-19** – Floated the seed microphone button over the main textarea, taught transcripts to overwrite the default seed copy instead of appending, mirrored the recording guidance toast on the update mic, and added a transcription system prompt that returns “no audio detected” whenever silence is captured.
