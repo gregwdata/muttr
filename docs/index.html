@@ -1547,6 +1547,10 @@
         const AUDIO_MAX_RECORDING_MS = 20000;
         const AUDIO_SILENCE_DURATION_MS = 3000;
         const AUDIO_SILENCE_THRESHOLD = 0.012;
+        const AUDIO_SILENCE_THRESHOLD_MIN = 0.002;
+        const AUDIO_SILENCE_THRESHOLD_MAX = 0.02;
+        const AUDIO_SILENCE_THRESHOLD_MULTIPLIER = 4;
+        const AUDIO_SILENCE_BASELINE_FRAMES = 90;
         const AUDIO_GUIDANCE_TOAST_DURATION_MS = 6000;
         const AudioContextCtor =
           typeof window !== 'undefined' ? window.AudioContext || window.webkitAudioContext : null;
@@ -1569,7 +1573,10 @@
           silenceSource: null,
           silenceData: null,
           silenceRafId: null,
-          silenceLastSpokeAt: null
+          silenceLastSpokeAt: null,
+          silenceDynamicThreshold: AUDIO_SILENCE_THRESHOLD,
+          silenceBaselineRms: null,
+          silenceBaselineSamples: 0
         };
 
         relayMessageButtons.forEach((cta) => {
@@ -2346,6 +2353,9 @@
           }
           audioState.silenceData = null;
           audioState.silenceLastSpokeAt = null;
+          audioState.silenceDynamicThreshold = AUDIO_SILENCE_THRESHOLD;
+          audioState.silenceBaselineRms = null;
+          audioState.silenceBaselineSamples = 0;
         }
 
         function stopActiveRecording() {
@@ -2418,6 +2428,9 @@
             audioState.silenceAnalyser = analyser;
             audioState.silenceData = dataArray;
             audioState.silenceLastSpokeAt = performance.now();
+            audioState.silenceDynamicThreshold = AUDIO_SILENCE_THRESHOLD;
+            audioState.silenceBaselineRms = null;
+            audioState.silenceBaselineSamples = 0;
 
             const checkSilence = () => {
               if (!audioState.mediaRecorder || audioState.mediaRecorder !== recorder || recorder.state !== 'recording') {
@@ -2431,8 +2444,27 @@
                 sumSquares += sample * sample;
               }
               const rms = Math.sqrt(sumSquares / dataArray.length);
+              if (audioState.silenceBaselineSamples < AUDIO_SILENCE_BASELINE_FRAMES) {
+                const nextSampleCount = audioState.silenceBaselineSamples + 1;
+                const prevBaseline = audioState.silenceBaselineRms || 0;
+                const updatedBaseline = prevBaseline + (rms - prevBaseline) / nextSampleCount;
+                audioState.silenceBaselineRms = updatedBaseline;
+                audioState.silenceBaselineSamples = nextSampleCount;
+                const adaptiveThreshold = Math.min(
+                  AUDIO_SILENCE_THRESHOLD_MAX,
+                  Math.max(AUDIO_SILENCE_THRESHOLD_MIN, updatedBaseline * AUDIO_SILENCE_THRESHOLD_MULTIPLIER)
+                );
+                audioState.silenceDynamicThreshold = Math.max(adaptiveThreshold, AUDIO_SILENCE_THRESHOLD_MIN);
+              }
+              const threshold = Math.min(
+                AUDIO_SILENCE_THRESHOLD_MAX,
+                Math.max(
+                  AUDIO_SILENCE_THRESHOLD_MIN,
+                  audioState.silenceDynamicThreshold || AUDIO_SILENCE_THRESHOLD
+                )
+              );
               const now = performance.now();
-              if (rms > AUDIO_SILENCE_THRESHOLD) {
+              if (rms > threshold) {
                 audioState.silenceLastSpokeAt = now;
               }
               if (now - (audioState.silenceLastSpokeAt || now) >= AUDIO_SILENCE_DURATION_MS) {
