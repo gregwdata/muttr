@@ -121,6 +121,10 @@ module.exports = async function (context, req) {
       ? payload.target.trim()
       : "seed";
 
+  const systemPrompt = `You are a meticulous transcription AI that only returns the exact words spoken in the recording. You are currently transcribing the ${
+    target === "update" ? "update" : "main"
+  } todo list text for muttr. If there is no discernible speech, only silence, or unintelligible noise, respond exactly with "no audio detected" and do not invent list items.`;
+
   const defaultModel =
     process.env.TRANSCRIBE_OPENROUTER_MODEL ||
     process.env.AUDIO_TRANSCRIBE_MODEL ||
@@ -188,6 +192,7 @@ module.exports = async function (context, req) {
   const openRouterPayload = {
     model,
     messages: [
+      { role: "system", content: systemPrompt },
       {
         role: "user",
         content: [

@@ -658,12 +658,6 @@
         box-shadow: 0 12px 22px rgba(249, 115, 22, 0.25);
       }
 
-      .audio-input-row {
-        display: flex;
-        justify-content: flex-end;
-        margin-bottom: 0.5rem;
-      }
-
       .label-row {
         display: flex;
         align-items: center;
@@ -673,6 +667,15 @@
 
       .label-row label {
         margin: 0;
+      }
+
+      .textarea-audio-wrapper {
+        position: relative;
+      }
+
+      .textarea-audio-wrapper textarea {
+        padding-right: 4rem;
+        padding-bottom: 3.25rem;
       }
 
       .relay-app button.audio-button {
@@ -700,6 +703,13 @@
         width: 36px;
         height: 36px;
         min-width: 36px;
+      }
+
+      .relay-app button.audio-button.audio-button--floating {
+        position: absolute;
+        right: 1.25rem;
+        bottom: 1.25rem;
+        box-shadow: 0 20px 35px rgba(15, 23, 42, 0.65);
       }
 
       .relay-app button.audio-button.is-recording {
@@ -733,6 +743,38 @@
         opacity: 0.4;
         cursor: not-allowed;
         animation: none;
+      }
+
+      .toast-container {
+        position: fixed;
+        top: 1rem;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        z-index: 20;
+        pointer-events: none;
+        width: min(90vw, 480px);
+      }
+
+      .toast {
+        background: rgba(15, 23, 42, 0.9);
+        border: 1px solid rgba(99, 102, 241, 0.4);
+        border-radius: 999px;
+        padding: 0.85rem 1.5rem;
+        font-size: 0.9rem;
+        line-height: 1.4;
+        text-align: center;
+        box-shadow: 0 20px 40px rgba(2, 6, 23, 0.45);
+        opacity: 0;
+        transform: translateY(-16px);
+        transition: opacity 0.25s ease, transform 0.25s ease;
+      }
+
+      .toast--visible {
+        opacity: 1;
+        transform: translateY(0);
       }
 
       .sr-only {
@@ -1052,6 +1094,7 @@
     </style>
   </head>
   <body>
+    <div id="toast-root" class="toast-container" aria-live="assertive" aria-atomic="true"></div>
     <div class="modal-backdrop" data-modal-backdrop hidden>
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" data-modal>
         <div class="modal-content">
@@ -1369,10 +1412,14 @@
           <div class="relay-app__grid">
             <section class="relay-app__panel">
               <h2>Place your concerns here</h2>
-              <div class="audio-input-row">
+              <div class="textarea-audio-wrapper">
+                <textarea id="relay-seed" placeholder="List the burdens weighing you down...">- Buy groceries
+- Eat lunch
+- Mow grass
+- Do Taxes</textarea>
                 <button
                   type="button"
-                  class="audio-button"
+                  class="audio-button audio-button--floating"
                   data-audio-target="seed"
                   title="Audio input"
                   aria-label="Capture audio for your main todo list"
@@ -1385,10 +1432,6 @@
                   <span class="sr-only">Capture audio for your main todo list</span>
                 </button>
               </div>
-              <textarea id="relay-seed" placeholder="List the burdens weighing you down...">- Buy groceries
-- Eat lunch
-- Mow grass
-- Do Taxes</textarea>
               <div class="label-row">
                 <label for="relay-update-input">Update your list</label>
                 <button
@@ -1541,6 +1584,7 @@
         if (!relayApp) return;
 
         const seed = relayApp.querySelector('#relay-seed');
+        const defaultSeedText = seed ? seed.value : '';
         const updateForm = relayApp.querySelector('#relay-update-form');
         const updateInput = relayApp.querySelector('#relay-update-input');
         const suggestionButtons = relayApp.querySelectorAll('.suggestion-button');
@@ -1553,6 +1597,7 @@
         const errorEl = relayApp.querySelector('#relay-error');
         const mapEl = relayApp.querySelector('#relay-map');
         const relaySection = document.getElementById('relay-app');
+        const toastContainer = document.getElementById('toast-root');
         const relayMessageButtons = document.querySelectorAll('[data-relay-message]');
         const hopTableHistory = [];
         const hopTableKeySet = new Set();
@@ -1562,6 +1607,13 @@
         const updateAudioButton = relayApp.querySelector('[data-audio-target="update"]');
         const AUDIO_TRANSCRIBE_ENDPOINT = 'https://muttr-us-east.azurewebsites.net/api/transcribe-audio';
         const AUDIO_MAX_RECORDING_MS = 20000;
+        const AUDIO_SILENCE_DURATION_MS = 3000;
+        const AUDIO_SILENCE_THRESHOLD = 0.012;
+        const AUDIO_SILENCE_THRESHOLD_MIN = 0.002;
+        const AUDIO_SILENCE_THRESHOLD_MAX = 0.02;
+        const AUDIO_SILENCE_THRESHOLD_MULTIPLIER = 4;
+        const AUDIO_SILENCE_BASELINE_FRAMES = 90;
+        const AUDIO_GUIDANCE_TOAST_DURATION_MS = 6000;
         const AudioContextCtor =
           typeof window !== 'undefined' ? window.AudioContext || window.webkitAudioContext : null;
         const audioState = {
@@ -1578,7 +1630,15 @@
           recordingButton: null,
           recordingTarget: null,
           stopTimer: null,
-          audioContext: null
+          audioContext: null,
+          silenceAnalyser: null,
+          silenceSource: null,
+          silenceData: null,
+          silenceRafId: null,
+          silenceLastSpokeAt: null,
+          silenceDynamicThreshold: AUDIO_SILENCE_THRESHOLD,
+          silenceBaselineRms: null,
+          silenceBaselineSamples: 0
         };
 
         relayMessageButtons.forEach((cta) => {
@@ -2332,7 +2392,36 @@
           }
         }
 
+        function stopSilenceDetection() {
+          if (audioState.silenceRafId) {
+            cancelAnimationFrame(audioState.silenceRafId);
+            audioState.silenceRafId = null;
+          }
+          if (audioState.silenceSource) {
+            try {
+              audioState.silenceSource.disconnect();
+            } catch (error) {
+              console.warn('Unable to disconnect silence monitor source', error);
+            }
+            audioState.silenceSource = null;
+          }
+          if (audioState.silenceAnalyser) {
+            try {
+              audioState.silenceAnalyser.disconnect();
+            } catch (error) {
+              console.warn('Unable to disconnect silence monitor analyser', error);
+            }
+            audioState.silenceAnalyser = null;
+          }
+          audioState.silenceData = null;
+          audioState.silenceLastSpokeAt = null;
+          audioState.silenceDynamicThreshold = AUDIO_SILENCE_THRESHOLD;
+          audioState.silenceBaselineRms = null;
+          audioState.silenceBaselineSamples = 0;
+        }
+
         function stopActiveRecording() {
+          stopSilenceDetection();
           if (audioState.mediaRecorder && audioState.mediaRecorder.state !== 'inactive') {
             try {
               audioState.mediaRecorder.stop();
@@ -2347,6 +2436,7 @@
             clearTimeout(audioState.stopTimer);
             audioState.stopTimer = null;
           }
+          stopSilenceDetection();
           audioState.mediaRecorder = null;
           audioState.chunks = [];
           audioState.recordingButton = null;
@@ -2354,6 +2444,7 @@
         }
 
         function cleanupAudioStream() {
+          stopSilenceDetection();
           if (audioState.stream) {
             audioState.stream.getTracks().forEach((track) => {
               try {
@@ -2381,6 +2472,76 @@
             }
           }
           return audioState.audioContext;
+        }
+
+        async function startSilenceDetection(stream, recorder) {
+          if (!audioState.supported || !AudioContextCtor || !stream || !recorder) {
+            return;
+          }
+          stopSilenceDetection();
+          try {
+            const ctx = await ensureSharedAudioContext();
+            const source = ctx.createMediaStreamSource(stream);
+            const analyser = ctx.createAnalyser();
+            analyser.fftSize = 2048;
+            const dataArray = new Float32Array(analyser.fftSize);
+            source.connect(analyser);
+            audioState.silenceSource = source;
+            audioState.silenceAnalyser = analyser;
+            audioState.silenceData = dataArray;
+            audioState.silenceLastSpokeAt = performance.now();
+            audioState.silenceDynamicThreshold = AUDIO_SILENCE_THRESHOLD;
+            audioState.silenceBaselineRms = null;
+            audioState.silenceBaselineSamples = 0;
+
+            const checkSilence = () => {
+              if (!audioState.mediaRecorder || audioState.mediaRecorder !== recorder || recorder.state !== 'recording') {
+                stopSilenceDetection();
+                return;
+              }
+              analyser.getFloatTimeDomainData(dataArray);
+              let sumSquares = 0;
+              for (let i = 0; i < dataArray.length; i += 1) {
+                const sample = dataArray[i] || 0;
+                sumSquares += sample * sample;
+              }
+              const rms = Math.sqrt(sumSquares / dataArray.length);
+              if (audioState.silenceBaselineSamples < AUDIO_SILENCE_BASELINE_FRAMES) {
+                const nextSampleCount = audioState.silenceBaselineSamples + 1;
+                const prevBaseline = audioState.silenceBaselineRms || 0;
+                const updatedBaseline = prevBaseline + (rms - prevBaseline) / nextSampleCount;
+                audioState.silenceBaselineRms = updatedBaseline;
+                audioState.silenceBaselineSamples = nextSampleCount;
+                const adaptiveThreshold = Math.min(
+                  AUDIO_SILENCE_THRESHOLD_MAX,
+                  Math.max(AUDIO_SILENCE_THRESHOLD_MIN, updatedBaseline * AUDIO_SILENCE_THRESHOLD_MULTIPLIER)
+                );
+                audioState.silenceDynamicThreshold = Math.max(adaptiveThreshold, AUDIO_SILENCE_THRESHOLD_MIN);
+              }
+              const threshold = Math.min(
+                AUDIO_SILENCE_THRESHOLD_MAX,
+                Math.max(
+                  AUDIO_SILENCE_THRESHOLD_MIN,
+                  audioState.silenceDynamicThreshold || AUDIO_SILENCE_THRESHOLD
+                )
+              );
+              const now = performance.now();
+              if (rms > threshold) {
+                audioState.silenceLastSpokeAt = now;
+              }
+              if (now - (audioState.silenceLastSpokeAt || now) >= AUDIO_SILENCE_DURATION_MS) {
+                stopSilenceDetection();
+                stopActiveRecording();
+                return;
+              }
+              audioState.silenceRafId = requestAnimationFrame(checkSilence);
+            };
+
+            audioState.silenceRafId = requestAnimationFrame(checkSilence);
+          } catch (error) {
+            console.warn('Unable to start silence detection', error);
+            stopSilenceDetection();
+          }
         }
 
         async function decodeBlobToAudioBuffer(blob) {
@@ -2488,8 +2649,8 @@
         async function sendAudioForTranscription(base64, format, target) {
           const prompt =
             target === 'update'
-              ? 'Transcribe this todo list update exactly as spoken. Return only the transcript.'
-              : 'Transcribe this todo list seed exactly as spoken, keeping its natural structure. Return only the transcript.';
+              ? 'Transcribe this todo list update exactly as spoken. Return only the transcript. If you do not hear anyone speaking, respond with "no audio detected".'
+              : 'Transcribe this todo list seed exactly as spoken, keeping its natural structure. Return only the transcript. If you do not hear anyone speaking, respond with "no audio detected".';
           const controller = new AbortController();
           const timeout = setTimeout(() => controller.abort(), 45000);
           try {
@@ -2551,8 +2712,13 @@
           }
           if (seed) {
             const existing = seed.value || '';
-            const needsBreak = existing && !existing.endsWith('\n') ? '\n' : '';
-            seed.value = existing ? `${existing}${needsBreak}${cleaned}` : cleaned;
+            const isDefaultSeed = defaultSeedText && existing === defaultSeedText;
+            if (isDefaultSeed) {
+              seed.value = cleaned;
+            } else {
+              const needsBreak = existing && !existing.endsWith('\n') ? '\n' : '';
+              seed.value = existing ? `${existing}${needsBreak}${cleaned}` : cleaned;
+            }
             seed.dispatchEvent(new Event('input', { bubbles: true }));
             seed.focus();
           }
@@ -2624,6 +2790,7 @@
               resetAudioRecordingState();
             });
             recorder.start();
+            startSilenceDetection(stream, recorder);
             audioState.stopTimer = setTimeout(() => {
               if (recorder.state === 'recording') {
                 recorder.stop();
@@ -2645,6 +2812,8 @@
             stopActiveRecording();
             return;
           }
+          const target = button.dataset.audioTarget || 'seed';
+          showAudioGuidanceToast(target);
           startRecording(button);
         }
 
@@ -2709,6 +2878,51 @@
             errorEl.hidden = true;
             errorEl.textContent = '';
           }
+        }
+
+        function showToast(message, options = {}) {
+          if (!toastContainer || !message) {
+            return null;
+          }
+          const { kind = 'default', duration = 5000, replaceExisting = false } = options;
+          if (replaceExisting && kind) {
+            toastContainer.querySelectorAll(`.toast[data-kind="${kind}"]`).forEach((node) => node.remove());
+          }
+          const toast = document.createElement('div');
+          toast.className = 'toast';
+          if (kind) {
+            toast.dataset.kind = kind;
+          }
+          toast.setAttribute('role', 'status');
+          toast.textContent = message;
+          toastContainer.appendChild(toast);
+          requestAnimationFrame(() => toast.classList.add('toast--visible'));
+          const hide = () => {
+            toast.classList.remove('toast--visible');
+            window.setTimeout(() => {
+              if (toast.parentNode) {
+                toast.parentNode.removeChild(toast);
+              }
+            }, 300);
+          };
+          const timeoutId = window.setTimeout(hide, Math.max(1500, duration));
+          return {
+            dismiss() {
+              window.clearTimeout(timeoutId);
+              hide();
+            }
+          };
+        }
+
+        function showAudioGuidanceToast(target = 'seed') {
+          const quietSeconds = Math.round(AUDIO_SILENCE_DURATION_MS / 1000);
+          const areaLabel = target === 'update' ? 'update input' : 'main list';
+          const message = `Audio recording for your ${areaLabel} will stop when you are quiet for ${quietSeconds} seconds or when you click the audio button again.`;
+          showToast(message, {
+            kind: 'audio-guidance',
+            duration: AUDIO_GUIDANCE_TOAST_DURATION_MS,
+            replaceExisting: true
+          });
         }
 
         const durationNumberFormatter = new Intl.NumberFormat(undefined, {

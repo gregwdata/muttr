@@ -5,6 +5,7 @@ on:
     branches: [ main ]
     paths:
       - 'MuttrHop/**'
+      - 'TranscribeAudio/**'
       - 'host.json'
       - '.github/workflows/deploy-muttr-hops.yml'
   workflow_dispatch:
@@ -110,6 +111,14 @@ jobs:
               -n "$APP_NAME" \
               --setting-names OPENROUTER_API_KEY OPENROUTER_MODEL >/dev/null 2>&1 || true
           fi
+
+      - name: Configure transcription settings
+        run: |
+          az functionapp config appsettings set \
+            --subscription "$AZURE_SUBSCRIPTION_ID" \
+            -g "$AZURE_RESOURCE_GROUP" \
+            -n "$APP_NAME" \
+            --settings TRANSCRIBE_OPENROUTER_API_KEY="${{ secrets.OPENROUTER_API_KEY }}" TRANSCRIBE_OPENROUTER_MODEL="google/gemini-2.0-flash-lite-001"
 
       - name: Configure CORS
         run: |

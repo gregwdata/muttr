@@ -15,7 +15,7 @@ This repo now ships a real around-the-world relay implemented with **Azure Funct
    - `muttr-singapore` (`southeastasia`)
    - `muttr-sydney` (`australiaeast`)
 
-   Each app exposes `POST https://<app>.azurewebsites.net/api/muttr` and shares the same implementation.
+   Each hop app exposes `POST https://<app>.azurewebsites.net/api/muttr` and shares the same implementation. The entry hop (`muttr-us-east`) also exposes `POST https://muttr-us-east.azurewebsites.net/api/transcribe-audio` and handles all OpenRouter-powered speech-to-text calls for the UI.
 
 2. **Hop headers**
    - `X-Direction`: `forward` or `return`
@@ -33,8 +33,8 @@ This repo now ships a real around-the-world relay implemented with **Azure Funct
 5. **Browser UI**
    - `docs/index.html` is a static viewer/loop driver that always targets the public US East Function entry hop and streams the todo list through the relay forever.
 
-6. **Audio transcription helper (US East)**
-   - `TranscribeAudio/index.js` exposes `POST /api/transcribe-audio`, accepts base64 WAV/MP3 payloads, and relays them to OpenRouter’s `google/gemini-2.0-flash-lite-001` model for speech-to-text before handing the transcript back to the UI.
+6. **Audio transcription helper (shared on the entry hop)**
+   - `TranscribeAudio/index.js` exposes `POST /api/transcribe-audio` from `muttr-us-east`, accepts base64 WAV/MP3 payloads, and relays them to OpenRouter’s `google/gemini-2.0-flash-lite-001` model for speech-to-text before handing the transcript back to the UI.
 
 ---
 
@@ -44,12 +44,12 @@ This repo now ships a real around-the-world relay implemented with **Azure Funct
 MuttrHop/          # Azure Function (single hop) implementation
   ├─ function.json # HTTP trigger binding (POST /api/muttr)
   └─ index.js      # Hop logic, OpenRouter integration, forward/return handling
-TranscribeAudio/   # Azure Function for OpenRouter-powered audio transcription (POST /api/transcribe-audio)
+TranscribeAudio/   # Azure Function for OpenRouter-powered audio transcription (POST /api/transcribe-audio on muttr-us-east)
   ├─ function.json
   └─ index.js
 host.json          # Azure Functions host config
 .github/workflows/
-  deploy-muttr-hops.yml  # CI/CD that provisions + deploys all Function Apps
+  deploy-muttr-hops.yml  # CI/CD that provisions + deploys all hop Function Apps and configures transcription on the entry hop
 src/worker.mjs     # Legacy Cloudflare Worker prototype (kept for reference)
 docs/index.html    # Static UI locked to the public first hop endpoint
 ```
@@ -97,9 +97,10 @@ The Cloudflare Worker script is still present for posterity but no longer powers
      - Azure login via the service principal.
      - Resource group creation (idempotent, uses `AZURE_RESOURCE_GROUP_LOCATION`).
      - Storage account creation (only on the first matrix iteration, also in `AZURE_RESOURCE_GROUP_LOCATION`).
-     - Function App creation if missing.
-     - App settings updates for hop wiring + OpenRouter credentials on the final hop.
-     - Code deployment for each Function App via `Azure/functions-action@v1`.
+   - Function App creation if missing.
+   - App settings updates for hop wiring + OpenRouter credentials on the final hop.
+    - App settings updates for the shared `transcribe-audio` endpoint on `muttr-us-east` (model + OpenRouter credentials).
+    - Code deployment for each Function App via `Azure/functions-action@v1`.
 
 > **Note:** The storage account name must be globally unique. Update `AZURE_STORAGE_ACCOUNT` in the workflow if the default is taken.
 
