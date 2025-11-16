@@ -69,6 +69,8 @@ Legacy Cloudflare Worker prototype retained for historical reference. No longer 
 
 ## 🛠 Implementation Log
 
+- **2025-03-18** – Taught the microphone silence detector to auto-calibrate its threshold so quieter desktop mics keep recording instead of bailing out, fixing the “works on mobile, silent on PC” reports.
+
 - **2025-03-17** – Added automatic microphone silence detection so recordings stop after three seconds of quiet, wired it into the OpenRouter transcription flow, and surfaced a toast reminding people they can wait for the auto-stop or click the mic again to end capture.
 - **2025-03-16** – Extended the Azure deployment workflow so the `muttr-transcribe-us-east` Function App receives the same GitHub Pages + Cloudflare CORS allowlist, keeping microphone transcription calls working cross-origin.
 - **2025-03-14** – Added microphone capture buttons for the seed and update inputs, wired them through a new US East `transcribe-audio` Azure Function that feeds OpenRouter’s `google/gemini-2.0-flash-lite-001`, and automatically injects the transcripts back into the appropriate fields while respecting the relay’s lock state.
