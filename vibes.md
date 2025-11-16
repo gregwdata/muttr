@@ -69,6 +69,8 @@ Legacy Cloudflare Worker prototype retained for historical reference. No longer 
 
 ## 🛠 Implementation Log
 
+- **2025-03-21** – Mirrored the landing page marketing copy (plus the muttrman hero art) into `README.md` so GitHub visitors get the same vibes as the site.
+- **2025-03-21** – Added a stealth 107-iteration cap inside `docs/index.html` so runaway laps stop themselves without advertising the limit in the UI.
 - **2025-03-17** – Deleted the checked-in mascot + favicon binaries (`docs/assets/muttrman.png`, `docs/assets/muttrman-pixel.png`, `docs/favicon.png`, `docs/favicon.ico`) so the repo stays text-only; remember to upload those exact files after merge so the hero and favicon render in production.
 - **2025-03-16** – Documented where to drop the muttrman hero art plus `favicon.png`/`favicon.ico` so folks can upload the binaries manually while keeping the repo text-only (`docs/assets/muttrman.png`, `docs/favicon.png`, `docs/favicon.ico`).
 - **2025-03-15** – Welcomed muttrman to the hero section with a masked fade treatment and added Cloudflare-friendly favicon assets derived from the pixel art mascot.
